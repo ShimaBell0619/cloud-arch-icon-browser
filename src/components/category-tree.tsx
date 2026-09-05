@@ -7,6 +7,7 @@ interface CategoryTreeProps {
   totalIcons: number;
   selectedCategory: string | null;
   onSelect: (categoryId: string | null) => void;
+  showAll?: boolean;
 }
 
 export function CategoryTree({
@@ -14,6 +15,7 @@ export function CategoryTree({
   totalIcons,
   selectedCategory,
   onSelect,
+  showAll = true,
 }: CategoryTreeProps) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
 
@@ -29,23 +31,25 @@ export function CategoryTree({
   return (
     <nav aria-label="Icon categories" className="min-w-0">
       <ul className="space-y-1">
-        <li>
-          <button
-            type="button"
-            aria-label={`All, ${formatIconCount(totalIcons)}`}
-            aria-current={selectedCategory === null ? "page" : undefined}
-            className={categoryButtonClass(selectedCategory === null)}
-            onClick={() => onSelect(null)}
-          >
-            <span className="flex min-w-0 items-center gap-2">
-              <Layers3Icon aria-hidden="true" className="size-4 shrink-0" />
-              <span className="truncate">All</span>
-            </span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {totalIcons}
-            </span>
-          </button>
-        </li>
+        {showAll ? (
+          <li>
+            <button
+              type="button"
+              aria-label={`All, ${formatIconCount(totalIcons)}`}
+              aria-current={selectedCategory === null ? "page" : undefined}
+              className={categoryButtonClass(selectedCategory === null)}
+              onClick={() => onSelect(null)}
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <Layers3Icon aria-hidden="true" className="size-4 shrink-0" />
+                <span className="truncate">All</span>
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {totalIcons}
+              </span>
+            </button>
+          </li>
+        ) : null}
         {categories.map((category) => (
           <CategoryNode
             key={category.id}
