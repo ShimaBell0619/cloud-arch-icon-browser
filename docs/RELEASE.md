@@ -10,28 +10,17 @@ The final npm package name is:
 @shimabell0619/cloud-arch-icon-browser
 ```
 
-The v0.1.0 publication PR sets `private=false` and `publishConfig.access=public`. Publication is still protected by `npm run verify:release-ready`, so the release workflow cannot publish while `COMPATIBILITY.md` says `Release gate: PENDING`.
+The v0.1.0 publication PR sets `private=false` and `publishConfig.access=public`. The current official `Azure_Public_Service_Icons_V24.zip` has passed the production-parser verification recorded in `COMPATIBILITY.md`, so the compatibility release gate is now `PASS`.
 
-Before merging the v0.1.0 publication PR, a maintainer must complete all of the following:
+Before merging the v0.1.0 publication PR, a maintainer must complete the remaining npm account/bootstrap steps:
 
-1. Download the current official Microsoft Azure Architecture Icons ZIP directly from Microsoft after reviewing and accepting Microsoft's applicable icon terms.
-2. Verify that local ZIP with the production parser:
-
-   ```bash
-   npm run verify:official -- /path/to/latest-official.zip
-   ```
-
-3. Record the measured compatibility metadata in `COMPATIBILITY.md` and change the exact release gate line to:
-
-   ```text
-   Release gate: PASS
-   ```
-
-4. Complete the one-time npm package bootstrap described below.
-5. Configure npm Trusted Publishing for the package and this repository's `release.yml` workflow.
-6. Confirm normal PR CI is green, then merge the publication PR.
+1. Complete the one-time npm package bootstrap described below.
+2. Configure npm Trusted Publishing for the package and this repository's `release.yml` workflow.
+3. Confirm normal PR CI is green, then merge the publication PR.
 
 When `private=false`, `npm run verify:release-ready` makes the scoped package name, repository URL, lockfile metadata, stable SemVer, and compatibility PASS record mandatory.
+
+For future Microsoft package updates, download the current official ZIP separately, run `npm run verify:official -- /path/to/latest-official.zip`, and update `COMPATIBILITY.md` only after successful production-parser verification. Never commit the Microsoft ZIP or SVG assets.
 
 ## One-time npm bootstrap
 
@@ -48,6 +37,7 @@ Use a disposable clean copy/worktree. Do not commit the bootstrap version to the
    npm run build
    npm run test:cli-package-smoke
    npm run verify:package
+   npm run verify:release-ready
    ```
 
 2. In the disposable copy only, set version `0.0.0`:
