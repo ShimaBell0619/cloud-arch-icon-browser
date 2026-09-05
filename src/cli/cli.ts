@@ -46,15 +46,29 @@ export function parseCliArguments(args: readonly string[]): CliCommand {
 }
 
 export async function readPackageVersion(): Promise<string> {
-  const packageJsonUrl = new URL("../../package.json", import.meta.url);
-  const packageJsonText = await readFile(packageJsonUrl, "utf8");
-  const packageJson: unknown = JSON.parse(packageJsonText);
+  const candidates = [
+    new URL("../package.json", import.meta.url),
+    new URL("../../package.json", import.meta.url),
+  ];
 
-  if (!isRecord(packageJson) || typeof packageJson.version !== "string") {
-    throw new Error("package.json does not contain a valid version string.");
+  for (const packageJsonUrl of candidates) {
+    let packageJsonText: string;
+    try {
+      packageJsonText = await readFile(packageJsonUrl, "utf8");
+    } catch (error) {
+      if (isMissingFileError(error)) continue;
+      throw error;
+    }
+
+    const packageJson: unknown = JSON.parse(packageJsonText);
+    if (!isRecord(packageJson) || typeof packageJson.version !== "string") {
+      throw new Error("package.json does not contain a valid version string.");
+    }
+
+    return packageJson.version;
   }
 
-  return packageJson.version;
+  throw new Error("Unable to locate package.json.");
 }
 
 export async function attemptBrowserOpen(
@@ -85,7 +99,9 @@ export async function runCli(args: readonly string[]): Promise<number> {
       process.stdout.write(`${await readPackageVersion()}\n`);
       return 0;
     } catch (error) {
-      process.stderr.write(`Unable to read package version: ${formatError(error)}\n`);
+      process.stderr.write(
+        `Unable to read package version: ${formatError(error)}\n`,
+      );
       return 1;
     }
   }
@@ -100,7 +116,7 @@ export async function runCli(args: readonly string[]): Promise<number> {
 
   let server: RunningStaticServer;
   try {
-    const staticRoot = fileURLToPath(new URL("../", import.meta.url));
+    const staticRoot = fileURLToPath(new URL("../dist/", import.meta.url));
     server = await startStaticServer({ rootDirectory: staticRoot });
   } catch (error) {
     process.stderr.write(`Unable to start local server: ${formatError(error)}\n`);
@@ -126,7 +142,9 @@ function installShutdownHandlers(server: RunningStaticServer): void {
     try {
       await server.close();
     } catch (error) {
-      process.stderr.write(`Unable to stop local server cleanly: ${formatError(error)}\n`);
+      process.stderr.write(
+        `Unable to stop local server cleanly: ${formatError(error)}\n`,
+      );
       process.exitCode = 1;
     }
   };
@@ -137,6 +155,11 @@ function installShutdownHandlers(server: RunningStaticServer): void {
 
   process.once("SIGINT", handleSignal);
   process.once("SIGTERM", handleSignal);
+}
+
+function isMissingFileError(error: unknown): boolean {
+  if (!(error instanceof Error) || !("code" in error)) return false;
+  return error.code === "ENOENT" || error.code === "ENOTDIR";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
