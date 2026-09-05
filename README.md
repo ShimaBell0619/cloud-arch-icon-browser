@@ -47,9 +47,21 @@ in [`COMPATIBILITY.md`](./COMPATIBILITY.md).
 
 ## Development
 
-Use the exact Node 24 version in [`.node-version`](./.node-version) and npm:
+Supported Node.js versions are defined by `package.json`:
+
+```text
+^22.22.2 || ^24.15.0 || >=26.0.0
+```
+
+Node 25.x is intentionally unsupported by the current dependency set. For
+reproducible local development and CI, use the exact version in
+[`.node-version`](./.node-version), currently Node 24.20.0.
+
+With nvm:
 
 ```bash
+nvm install 24.20.0
+nvm use 24.20.0
 npm ci
 npm run dev
 ```
