@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
 import {
@@ -158,6 +159,24 @@ describe("icon browser UI", () => {
     );
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("loads a package under React StrictMode without getting stuck in Reading", async () => {
+    const user = userEvent.setup();
+    const { open } = installPackageOpenMock();
+    render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+
+    await loadDummyPackage(user);
+
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Reading package")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "App Service, Compute" }),
+    ).toBeVisible();
   });
 
   it("browses recursive categories and preserves the query when scope changes", async () => {
