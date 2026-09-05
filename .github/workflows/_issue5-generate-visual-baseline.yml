@@ -1,0 +1,47 @@
+name: Issue 5 visual baseline generation
+
+on:
+  push:
+    branches: [chore/issue-5-release-readiness]
+    paths:
+      - ".github/workflows/_issue5-generate-visual-baseline.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: chore/issue-5-release-readiness
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: python3 scripts/ui-review/create_fixture.py /tmp/cloud-arch-icon-browser-e2e-fixture.zip
+      - name: Generate Linux visual snapshots
+        env:
+          E2E_FIXTURE: /tmp/cloud-arch-icon-browser-e2e-fixture.zip
+        run: npm run test:e2e:update
+      - name: Run full browser suite against generated snapshots
+        env:
+          E2E_FIXTURE: /tmp/cloud-arch-icon-browser-e2e-fixture.zip
+        run: npm run test:e2e
+      - name: Commit visual snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- tests/e2e; then
+            echo "No visual snapshot changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/e2e
+          git commit -m "test: record stable Linux visual baselines"
+          git push origin HEAD:chore/issue-5-release-readiness
