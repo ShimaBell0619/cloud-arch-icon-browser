@@ -1,14 +1,4 @@
 import {
-  type ChangeEvent,
-  type DragEvent,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
   AlertCircleIcon,
   ArrowUpRightIcon,
   FolderArchiveIcon,
@@ -19,15 +9,25 @@ import {
   UploadIcon,
   XIcon,
 } from "lucide-react";
+import {
+  type ChangeEvent,
+  type DragEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
 import { CategoryTree } from "@/components/category-tree";
 import { IconDetailsDialog } from "@/components/icon-details-dialog";
 import { LazyIconPreview } from "@/components/lazy-icon-preview";
 import { Button } from "@/components/ui/button";
 import {
-  IconPackageSession,
   type IconCategory,
   type IconEntry,
+  IconPackageSession,
   type PackageProblem,
 } from "@/core";
 import { version } from "../package.json";
@@ -53,7 +53,9 @@ export function App() {
   const activeSessionRef = useRef<IconPackageSession | null>(null);
   const operationRef = useRef(0);
   const mountedRef = useRef(true);
-  const [loadedPackage, setLoadedPackage] = useState<LoadedPackage | null>(null);
+  const [loadedPackage, setLoadedPackage] = useState<LoadedPackage | null>(
+    null,
+  );
   const [loadPhase, setLoadPhase] = useState<LoadPhase | null>(null);
   const [loadError, setLoadError] = useState<PackageProblem | null>(null);
 
@@ -172,7 +174,9 @@ function PackagePicker({ loadPhase, loadError, onLoad }: PackagePickerProps) {
       <header className="flex items-center gap-3">
         <BrandMark />
         <div>
-          <p className="text-xs text-muted-foreground">Local workspace · v{version}</p>
+          <p className="text-xs text-muted-foreground">
+            Local workspace · v{version}
+          </p>
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
             Cloud Arch Icon Browser
           </h1>
@@ -195,7 +199,10 @@ function PackagePicker({ loadPhase, loadError, onLoad }: PackagePickerProps) {
         <div className="flex min-h-72 flex-col items-center justify-center text-center">
           <div className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
             {loadPhase ? (
-              <LoaderCircleIcon aria-hidden="true" className="size-5 animate-spin" />
+              <LoaderCircleIcon
+                aria-hidden="true"
+                className="size-5 animate-spin"
+              />
             ) : (
               <FolderArchiveIcon aria-hidden="true" className="size-5" />
             )}
@@ -283,7 +290,11 @@ function LoadPhases({ active }: { active: LoadPhase }) {
             aria-hidden="true"
             className={`size-2 rounded-full ${index <= activeIndex ? "bg-primary" : "bg-muted"}`}
           />
-          <span className={index === activeIndex ? "font-medium text-foreground" : ""}>
+          <span
+            className={
+              index === activeIndex ? "font-medium text-foreground" : ""
+            }
+          >
             {phase.charAt(0).toUpperCase()}
             {phase.slice(1)}
           </span>
@@ -315,7 +326,9 @@ function LoadedWorkspace({
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedIcon, setSelectedIcon] = useState<IconEntry | null>(null);
-  const [detailsTrigger, setDetailsTrigger] = useState<HTMLElement | null>(null);
+  const [detailsTrigger, setDetailsTrigger] = useState<HTMLElement | null>(
+    null,
+  );
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [dropNotice, setDropNotice] = useState<string | null>(null);
 
@@ -346,6 +359,26 @@ function LoadedWorkspace({
     return () => window.removeEventListener("keydown", handleSlash);
   }, []);
 
+  useEffect(() => {
+    const handleGlobalDragOver = (event: globalThis.DragEvent) => {
+      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+    };
+    const handleGlobalDrop = (event: globalThis.DragEvent) => {
+      if (!event.dataTransfer?.files.length) return;
+      event.preventDefault();
+      setDropNotice(
+        "A package is already loaded. Use Change package to replace it.",
+      );
+    };
+
+    window.addEventListener("dragover", handleGlobalDragOver);
+    window.addEventListener("drop", handleGlobalDrop);
+    return () => {
+      window.removeEventListener("dragover", handleGlobalDragOver);
+      window.removeEventListener("drop", handleGlobalDrop);
+    };
+  }, []);
+
   const handleReplacementInput = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
@@ -364,25 +397,15 @@ function LoadedWorkspace({
   };
 
   return (
-    <div
-      className="min-h-svh bg-background"
-      onDragOver={(event) => {
-        if (event.dataTransfer.types.includes("Files")) event.preventDefault();
-      }}
-      onDrop={(event) => {
-        if (!event.dataTransfer.files.length) return;
-        event.preventDefault();
-        setDropNotice(
-          "A package is already loaded. Use Change package to replace it.",
-        );
-      }}
-    >
+    <div className="min-h-svh bg-background">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-card lg:flex">
         <div className="border-b border-border p-4">
           <div className="flex items-center gap-2.5">
             <BrandMark compact />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">Cloud Arch Icon Browser</p>
+              <p className="truncate text-sm font-semibold">
+                Cloud Arch Icon Browser
+              </p>
               <p className="text-xs text-muted-foreground">Local package</p>
             </div>
           </div>
@@ -507,13 +530,18 @@ function LoadedWorkspace({
         </header>
 
         <main className="p-3 sm:p-4 lg:p-5">
-          {loadError ? <PackageErrorNotice problem={loadError} compact /> : null}
+          {loadError ? (
+            <PackageErrorNotice problem={loadError} compact />
+          ) : null}
           {dropNotice ? (
             <div
               role="status"
               className="mb-3 flex items-start gap-2 rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground"
             >
-              <AlertCircleIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <AlertCircleIcon
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0"
+              />
               <span>{dropNotice}</span>
               <button
                 type="button"
@@ -599,7 +627,9 @@ function IconCard({ session, icon, onOpen }: IconCardProps) {
         <p className="line-clamp-2 text-sm font-medium leading-5">
           {icon.displayName}
         </p>
-        <p className="mt-1 truncate text-xs text-muted-foreground">{category}</p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">
+          {category}
+        </p>
       </div>
       <span
         id={tooltipId}
@@ -762,7 +792,10 @@ function PackageErrorNotice({
       className={`${compact ? "mb-3" : "mt-5"} rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-3 text-left text-sm text-destructive`}
     >
       <div className="flex items-start gap-2">
-        <AlertCircleIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+        <AlertCircleIcon
+          aria-hidden="true"
+          className="mt-0.5 size-4 shrink-0"
+        />
         <div>
           <p className="font-medium">{problem.message}</p>
           <p className="mt-1 text-xs leading-5 opacity-90">{problem.action}</p>
