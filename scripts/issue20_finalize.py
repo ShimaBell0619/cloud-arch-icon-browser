@@ -6,6 +6,18 @@ text = text.replace(
     "  expanded?: boolean;\n  trailing?: ReactNode;",
     "  expanded?: boolean | undefined;\n  trailing?: ReactNode | undefined;",
 )
+text = text.replace(
+    '''      <div
+        role="group"
+        aria-label="Theme"
+        className={compact ? "space-y-1" : "grid grid-cols-3 gap-1"}
+      >''',
+    '''      <fieldset
+        className={compact ? "space-y-1" : "grid grid-cols-3 gap-1"}
+      >
+        <legend className="sr-only">Theme</legend>''',
+)
+text = text.replace("      </div>\n    </div>\n  );\n}\n\nfunction WorkspacePlaceholder", "      </fieldset>\n    </div>\n  );\n}\n\nfunction WorkspacePlaceholder")
 app.write_text(text)
 
 design = Path("DESIGN.md")
