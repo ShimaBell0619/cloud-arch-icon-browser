@@ -1,6 +1,6 @@
 # Cloud Arch Icon Browser
 
-> Pre-release: `v0.1.0` is in development.
+> Current release: `v0.1.0`
 
 A local, browser-based viewer for Microsoft Azure Architecture Icons.
 
@@ -16,13 +16,17 @@ npx @shimabell06/cloud-arch-icon-browser
 
 The command starts a temporary HTTP server bound to `127.0.0.1` on an available port and opens the local web UI in the default browser. The ZIP selected by the user is processed locally and is not uploaded or persisted by the application.
 
-## MVP goals
+## Features
+
+`v0.1.0` provides the first complete public release of the local icon-browser workflow:
 
 - Load a user-selected official Azure Architecture Icons ZIP.
 - Preserve and browse the ZIP folder hierarchy as categories.
 - Search icons with exact, prefix, substring, normalized, and fuzzy matching.
 - Preview SVG icons without modifying the original SVG.
 - Download individual original SVG files with their official filenames unchanged.
+- Replace the active package without reloading the application.
+- Use responsive navigation, details dialogs, and keyboard interactions.
 - Run locally through `npx` with no automatic runtime network access.
 
 ## Official icon package
@@ -33,13 +37,19 @@ https://learn.microsoft.com/en-us/azure/architecture/icons/
 
 The app may provide manual links to Microsoft documentation, but it does not automatically download the icon package or contact Microsoft at runtime.
 
+The latest package explicitly verified for this project is recorded in [`COMPATIBILITY.md`](./COMPATIBILITY.md). Compatibility is structural rather than tied to a hard-coded Microsoft ZIP version.
+
 ## Project status
 
-The project includes a local browser UI and a React-independent core for ZIP validation, metadata/categories, search, lazy SVG previews, and original-file downloads. The UI supports local package selection/replacement, recursive category browsing, debounced search, responsive navigation, details dialogs, and keyboard interaction. The production localhost CLI/static server is implemented with loopback-only binding, Host/path validation, restrictive browser security headers, and clean shutdown behavior.
+`v0.1.0` is published on npm as `@shimabell06/cloud-arch-icon-browser` and is the first public release. The production package contains the localhost CLI and prebuilt Web UI; Microsoft icon ZIP/SVG assets are never bundled into the package.
 
-Release-readiness automation covers Linux browser E2E/accessibility/visual regression, Linux build/package checks, Windows/macOS packaged CLI smoke tests, `npm pack` leak validation, Changesets release PRs, an OIDC npm release workflow, and a weekly Microsoft source-change watcher. The npm package name is `@shimabell06/cloud-arch-icon-browser`; publication is activated with `private: false`. The current official `Azure_Public_Service_Icons_V24.zip` has passed the production-parser compatibility verification recorded in [`COMPATIBILITY.md`](./COMPATIBILITY.md). The remaining first-publication work is the one-time npm registry bootstrap and Trusted Publisher configuration described in [`docs/RELEASE.md`](./docs/RELEASE.md).
+The implementation includes a React-independent core for ZIP validation, metadata/categories, search, lazy SVG previews, and original-file downloads. The production localhost CLI/static server uses loopback-only binding, Host/path validation, restrictive browser security headers, and clean shutdown behavior.
 
-See the [core integration notes](./docs/icon-package-core.md) for its API and validation boundaries and [`docs/RELEASE.md`](./docs/RELEASE.md) for the release/bootstrap runbook.
+Release and maintenance automation includes Linux browser E2E/accessibility/visual regression, Linux build/package checks, Windows/macOS packaged CLI smoke tests, npm package leak validation, Changesets release PRs, npm Trusted Publishing through GitHub Actions OIDC with provenance, registry/tarball availability verification, and a weekly Microsoft source-change watcher.
+
+The current official `Azure_Public_Service_Icons_V24.zip` has passed the production-parser compatibility verification recorded in [`COMPATIBILITY.md`](./COMPATIBILITY.md).
+
+See the [core integration notes](./docs/icon-package-core.md) for the core API and validation boundaries and [`docs/RELEASE.md`](./docs/RELEASE.md) for the steady-state release runbook.
 
 ## Development
 
@@ -97,11 +107,11 @@ npm run verify:official -- /path/to/latest-official.zip
 
 See:
 
-- [`DESIGN.md`](./DESIGN.md) — product and architecture source of truth.
+- [`DESIGN.md`](./DESIGN.md) — current product and architecture design contract.
 - [`AGENTS.md`](./AGENTS.md) — repository instructions for coding agents.
 - [`COMPATIBILITY.md`](./COMPATIBILITY.md) — official package compatibility and verification status.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — contribution workflow.
-- [`docs/RELEASE.md`](./docs/RELEASE.md) — release, npm bootstrap, OIDC, and watcher runbook.
+- [`docs/RELEASE.md`](./docs/RELEASE.md) — release, Trusted Publishing, compatibility, and watcher runbook.
 - [`SECURITY.md`](./SECURITY.md) — vulnerability reporting policy.
 
 ## License
