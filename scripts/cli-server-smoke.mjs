@@ -67,6 +67,10 @@ async function waitForUrl() {
 }
 
 function waitForExit() {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve({ code: child.exitCode, signal: child.signalCode });
+  }
+
   return new Promise((resolvePromise, rejectPromise) => {
     const timer = setTimeout(() => {
       rejectPromise(new Error("Timed out waiting for CLI shutdown."));
