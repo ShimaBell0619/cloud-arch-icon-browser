@@ -1,0 +1,40 @@
+name: Microsoft icon source watch
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - id: watch
+        name: Compare official page with reviewed baseline
+        run: node scripts/check-microsoft-icons.mjs
+      - name: Open or update maintenance issue
+        if: steps.watch.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_PATH: ${{ steps.watch.outputs.report_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="chore: review Microsoft Azure Architecture Icons source change"
+          existing="$(gh issue list --state open --limit 100 --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$REPORT_PATH"
+            echo "Updated existing maintenance issue #$existing."
+          else
+            gh issue create --title "$title" --body-file "$REPORT_PATH"
+          fi
