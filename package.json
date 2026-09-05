@@ -8,6 +8,9 @@
     "type": "git",
     "url": "https://github.com/ShimaBell0619/cloud-arch-icon-browser.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "cloud-arch-icon-browser": "cli/index.js"
