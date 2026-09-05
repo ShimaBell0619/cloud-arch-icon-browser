@@ -2,6 +2,7 @@ name: Pages Preview
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
   push:
     branches: [main]
   workflow_dispatch:
@@ -9,19 +10,17 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'deploy' }}
-  cancel-in-progress: true
-
 jobs:
-  build:
+  validate:
     name: Build Pages preview
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -30,27 +29,273 @@ jobs:
 
       - run: npm ci
       - run: npm run typecheck
-      - run: npx vite build --base=/cloud-arch-icon-browser/
 
-      - name: Upload Pages artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
-        with:
-          path: dist
+      - name: Resolve Pages base path
+        id: target
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            echo "base=/cloud-arch-icon-browser/pr-${PR_NUMBER}/" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=/cloud-arch-icon-browser/" >> "$GITHUB_OUTPUT"
+          fi
 
-  deploy:
-    name: Deploy Pages preview
-    if: github.event_name != 'pull_request'
-    needs: build
+      - name: Build preview target
+        run: npx vite build --base="${{ steps.target.outputs.base }}"
+
+  publish:
+    name: Publish Pages preview
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       github.event.action != 'closed' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    needs: validate
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
+    concurrency:
+      group: pages-site-publish
+      cancel-in-progress: false
     permissions:
+      contents: write
       pages: write
       id-token: write
+      issues: write
+      pull-requests: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - name: Resolve publish target
+        id: target
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            echo "base=/cloud-arch-icon-browser/pr-${PR_NUMBER}/" >> "$GITHUB_OUTPUT"
+            echo "path=pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=/cloud-arch-icon-browser/" >> "$GITHUB_OUTPUT"
+            echo "path=." >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build publish target
+        run: npx vite build --base="${{ steps.target.outputs.base }}"
+
+      - name: Stage persistent Pages content
+        id: stage
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_PATH: ${{ steps.target.outputs.path }}
+        run: |
+          set -euo pipefail
+
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          publish_dir="${RUNNER_TEMP}/pages-content"
+          deploy_dir="${RUNNER_TEMP}/pages-deploy"
+
+          if git ls-remote --exit-code "$remote" refs/heads/pages-content >/dev/null 2>&1; then
+            git clone --depth 1 --branch pages-content "$remote" "$publish_dir"
+          else
+            mkdir -p "$publish_dir"
+            git -C "$publish_dir" init -b pages-content
+          fi
+
+          git -C "$publish_dir" config user.name "github-actions[bot]"
+          git -C "$publish_dir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          bootstrap_main() {
+            local main_source="${RUNNER_TEMP}/pages-main-source"
+            rm -rf "$main_source"
+            git clone --depth 1 --branch main "$remote" "$main_source"
+            (
+              cd "$main_source"
+              npm ci
+              npx vite build --base=/cloud-arch-icon-browser/
+            )
+            find "$publish_dir" -mindepth 1 -maxdepth 1 \
+              ! -name .git ! -name 'pr-*' -exec rm -rf {} +
+            cp -a "$main_source/dist/." "$publish_dir/"
+          }
+
+          if [[ "$TARGET_PATH" != "." && ! -f "$publish_dir/index.html" ]]; then
+            bootstrap_main
+          fi
+
+          if [[ "$TARGET_PATH" == "." ]]; then
+            find "$publish_dir" -mindepth 1 -maxdepth 1 \
+              ! -name .git ! -name 'pr-*' -exec rm -rf {} +
+            cp -a "$GITHUB_WORKSPACE/dist/." "$publish_dir/"
+          else
+            rm -rf "$publish_dir/$TARGET_PATH"
+            mkdir -p "$publish_dir/$TARGET_PATH"
+            cp -a "$GITHUB_WORKSPACE/dist/." "$publish_dir/$TARGET_PATH/"
+          fi
+
+          touch "$publish_dir/.nojekyll"
+          git -C "$publish_dir" add -A
+
+          if ! git -C "$publish_dir" diff --cached --quiet; then
+            git -C "$publish_dir" commit -m "chore(pages): publish ${TARGET_PATH}"
+            git -C "$publish_dir" push "$remote" HEAD:pages-content
+          fi
+
+          rm -rf "$deploy_dir"
+          mkdir -p "$deploy_dir"
+          rsync -a --exclude=.git "$publish_dir/" "$deploy_dir/"
+          echo "deploy_dir=$deploy_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ${{ steps.stage.outputs.deploy_dir }}
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+
+      - name: Upsert PR preview link
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          owner="${GITHUB_REPOSITORY%%/*}"
+          repo="${GITHUB_REPOSITORY#*/}"
+          preview_url="https://${owner,,}.github.io/${repo}/pr-${PR_NUMBER}/"
+          short_sha="${HEAD_SHA:0:7}"
+          marker='<!-- pages-preview -->'
+          body=$(printf '%s\n### Pages preview\n\n%s\n\nUpdated from `%s`.' "$marker" "$preview_url" "$short_sha")
+
+          comment_id=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --paginate \
+            --jq '.[] | select(.body | contains("<!-- pages-preview -->")) | .id' \
+            | head -n 1)
+
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
+              -f body="$body" >/dev/null
+          else
+            gh api --method POST \
+              "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              -f body="$body" >/dev/null
+          fi
+
+  cleanup:
+    name: Remove closed PR preview
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: pages-site-publish
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+      issues: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Remove preview from persistent Pages content
+        id: cleanup
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          publish_dir="${RUNNER_TEMP}/pages-content"
+          deploy_dir="${RUNNER_TEMP}/pages-deploy"
+
+          if ! git ls-remote --exit-code "$remote" refs/heads/pages-content >/dev/null 2>&1; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git clone --depth 1 --branch pages-content "$remote" "$publish_dir"
+          git -C "$publish_dir" config user.name "github-actions[bot]"
+          git -C "$publish_dir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          target="pr-${PR_NUMBER}"
+          if [[ ! -d "$publish_dir/$target" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          rm -rf "$publish_dir/$target"
+          git -C "$publish_dir" add -A
+          git -C "$publish_dir" commit -m "chore(pages): remove ${target}"
+          git -C "$publish_dir" push "$remote" HEAD:pages-content
+
+          mkdir -p "$deploy_dir"
+          rsync -a --exclude=.git "$publish_dir/" "$deploy_dir/"
+          echo "deploy_dir=$deploy_dir" >> "$GITHUB_OUTPUT"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Pages artifact
+        if: steps.cleanup.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: ${{ steps.cleanup.outputs.deploy_dir }}
+
+      - name: Deploy cleaned Pages site
+        if: steps.cleanup.outputs.changed == 'true'
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
+
+      - name: Mark PR preview removed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          comment_id=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --paginate \
+            --jq '.[] | select(.body | contains("<!-- pages-preview -->")) | .id' \
+            | head -n 1)
+
+          if [[ -z "$comment_id" ]]; then
+            exit 0
+          fi
+
+          body=$(printf '%s\n### Pages preview\n\nPreview removed because this PR is closed.' '<!-- pages-preview -->')
+          gh api --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
+            -f body="$body" >/dev/null
