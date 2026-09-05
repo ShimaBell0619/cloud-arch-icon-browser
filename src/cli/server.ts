@@ -1,4 +1,4 @@
-import { readFile, realpath, stat } from "node:fs/promises";
+import { readFile, readdir, realpath } from "node:fs/promises";
 import {
   createServer,
   type IncomingMessage,
@@ -42,6 +42,12 @@ const MIME_TYPES = new Map<string, string>([
   [".woff2", "font/woff2"],
 ]);
 
+interface StaticAsset {
+  body: Buffer;
+  contentType: string;
+  cacheControl: string;
+}
+
 export interface StaticServerOptions {
   rootDirectory: string;
 }
@@ -56,18 +62,19 @@ export async function startStaticServer(
   options: StaticServerOptions,
 ): Promise<RunningStaticServer> {
   const rootDirectory = await realpath(options.rootDirectory);
+  const staticAssets = await loadStaticAssets(rootDirectory);
   let selectedPort = 0;
 
   const server = createServer((request, response) => {
-    void handleRequest(request, response, rootDirectory, selectedPort).catch(
-      () => {
-        if (!response.headersSent) {
-          sendText(request, response, 500, "Internal Server Error\n");
-          return;
-        }
-        response.destroy();
-      },
-    );
+    try {
+      handleRequest(request, response, staticAssets, selectedPort);
+    } catch {
+      if (!response.headersSent) {
+        sendText(request, response, 500, "Internal Server Error\n");
+        return;
+      }
+      response.destroy();
+    }
   });
 
   server.on("clientError", (_error, socket) => {
@@ -100,12 +107,12 @@ export async function startStaticServer(
   };
 }
 
-async function handleRequest(
+function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
-  rootDirectory: string,
+  staticAssets: ReadonlyMap<string, StaticAsset>,
   port: number,
-): Promise<void> {
+): void {
   applySecurityHeaders(response);
 
   if (!isExpectedHost(request.headers.host, port)) {
@@ -125,53 +132,87 @@ async function handleRequest(
     return;
   }
 
-  const candidatePath = resolve(rootDirectory, relativePath);
-  if (!isWithinRoot(rootDirectory, candidatePath)) {
-    sendText(request, response, 400, "Bad Request\n");
+  const asset = staticAssets.get(relativePath);
+  if (asset === undefined) {
+    sendText(request, response, 404, "Not Found\n");
     return;
   }
 
-  let filePath: string;
-  let fileSize: number;
-
-  try {
-    const candidateStats = await stat(candidatePath);
-    if (!candidateStats.isFile()) {
-      sendText(request, response, 404, "Not Found\n");
-      return;
-    }
-
-    filePath = await realpath(candidatePath);
-    if (!isWithinRoot(rootDirectory, filePath)) {
-      sendText(request, response, 400, "Bad Request\n");
-      return;
-    }
-
-    fileSize = candidateStats.size;
-  } catch (error) {
-    if (isMissingPathError(error)) {
-      sendText(request, response, 404, "Not Found\n");
-      return;
-    }
-    throw error;
-  }
-
   response.statusCode = 200;
-  response.setHeader(
-    "Content-Type",
-    MIME_TYPES.get(extname(filePath).toLowerCase()) ??
-      "application/octet-stream",
-  );
-  response.setHeader("Content-Length", String(fileSize));
-  response.setHeader("Cache-Control", cacheControlFor(relativePath));
+  response.setHeader("Content-Type", asset.contentType);
+  response.setHeader("Content-Length", String(asset.body.byteLength));
+  response.setHeader("Cache-Control", asset.cacheControl);
 
   if (request.method === "HEAD") {
     response.end();
     return;
   }
 
-  const body = await readFile(filePath);
-  response.end(body);
+  response.end(asset.body);
+}
+
+async function loadStaticAssets(
+  rootDirectory: string,
+): Promise<Map<string, StaticAsset>> {
+  const assets = new Map<string, StaticAsset>();
+  await collectStaticAssets(rootDirectory, rootDirectory, [], assets);
+
+  if (!assets.has("index.html")) {
+    throw new Error("Static build output does not contain index.html.");
+  }
+
+  return assets;
+}
+
+async function collectStaticAssets(
+  rootDirectory: string,
+  currentDirectory: string,
+  pathSegments: readonly string[],
+  assets: Map<string, StaticAsset>,
+): Promise<void> {
+  const entries = await readdir(currentDirectory, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const absolutePath = resolve(currentDirectory, entry.name);
+    if (!isWithinRoot(rootDirectory, absolutePath)) {
+      throw new Error("Static build output escaped its configured root.");
+    }
+
+    const nextSegments = [...pathSegments, entry.name];
+
+    if (entry.isSymbolicLink()) {
+      throw new Error("Static build output must not contain symbolic links.");
+    }
+
+    if (entry.isDirectory()) {
+      await collectStaticAssets(
+        rootDirectory,
+        absolutePath,
+        nextSegments,
+        assets,
+      );
+      continue;
+    }
+
+    if (!entry.isFile()) {
+      throw new Error("Static build output contains an unsupported file type.");
+    }
+
+    const canonicalPath = await realpath(absolutePath);
+    if (!isWithinRoot(rootDirectory, canonicalPath)) {
+      throw new Error("Static build output escaped its configured root.");
+    }
+
+    const relativePath = nextSegments.join("/");
+    const body = await readFile(canonicalPath);
+    assets.set(relativePath, {
+      body,
+      contentType:
+        MIME_TYPES.get(extname(canonicalPath).toLowerCase()) ??
+        "application/octet-stream",
+      cacheControl: cacheControlFor(relativePath),
+    });
+  }
 }
 
 function parseStaticPath(rawUrl: string | undefined): string | null {
@@ -312,9 +353,4 @@ function closeServer(server: ReturnType<typeof createServer>): Promise<void> {
       resolvePromise();
     });
   });
-}
-
-function isMissingPathError(error: unknown): boolean {
-  if (!(error instanceof Error) || !("code" in error)) return false;
-  return error.code === "ENOENT" || error.code === "ENOTDIR";
 }
