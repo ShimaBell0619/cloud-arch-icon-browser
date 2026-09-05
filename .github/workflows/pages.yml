@@ -3,7 +3,7 @@ name: Pages Preview
 on:
   pull_request:
   push:
-    branches: [main, chore/27-pages-mobile-picker]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
