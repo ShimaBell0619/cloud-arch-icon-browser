@@ -6,11 +6,28 @@ The final dependency/license inventory must be reviewed before the first npm rel
 
 ## Geist
 
-The project plans to bundle Geist Sans Variable locally for the application UI.
+The application bundles Geist Sans Variable through the exact-pinned
+`@fontsource-variable/geist` npm dependency. Vite emits the font files into the
+local build; no font CDN is used at runtime.
 
 Geist is distributed under the SIL Open Font License 1.1 (OFL-1.1). The upstream license text and required notices must be retained in the distributed npm package as required by that license.
 
 The font files are third-party assets and are not licensed under this project's MIT License.
+
+The upstream copyright notice and full OFL text are retained verbatim in
+[`public/licenses/Geist-OFL-1.1.txt`](./public/licenses/Geist-OFL-1.1.txt), copied
+from the installed font package's `LICENSE`. Vite copies this file to
+`dist/licenses/Geist-OFL-1.1.txt`. When updating the font dependency, refresh this
+copy from the installed package and retain it in future npm package contents.
+
+## shadcn/ui
+
+`src/components/ui/button.tsx` is derived from the official shadcn/ui
+[Base UI Rhea registry](https://ui.shadcn.com/r/styles/base-rhea/button.json).
+It uses the project's local class-name helper and semantic hover token.
+Copyright (c) 2023 shadcn. The upstream MIT license is retained in
+[`public/licenses/shadcn-MIT.txt`](./public/licenses/shadcn-MIT.txt) and copied
+into `dist/licenses/` by Vite.
 
 ## Runtime and development dependencies
 
