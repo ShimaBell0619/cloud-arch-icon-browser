@@ -1,5 +1,5 @@
-import { Component, type ReactNode } from "react";
 import { AlertTriangleIcon, RotateCcwIcon } from "lucide-react";
+import { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 interface AppErrorBoundaryProps {
