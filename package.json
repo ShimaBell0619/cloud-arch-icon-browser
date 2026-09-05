@@ -4,6 +4,10 @@
   "private": true,
   "description": "A local browser for user-provided architecture icon packages.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShimaBell0619/cloud-arch-icon-browser.git"
+  },
   "type": "module",
   "bin": {
     "cloud-arch-icon-browser": "cli/index.js"
@@ -36,7 +40,7 @@
     "verify:package": "node scripts/validate-package.mjs",
     "verify:official": "node scripts/verify-official.mjs",
     "changeset": "changeset",
-    "version-packages": "changeset version"
+    "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",
