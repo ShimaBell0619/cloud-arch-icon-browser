@@ -1,5 +1,12 @@
 import { spawn, spawnSync } from "node:child_process";
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,15 +18,24 @@ const packageJson = JSON.parse(
 const npmExecPath = process.env.npm_execpath;
 
 assert(typeof packageJson.name === "string", "package.json is missing name");
-assert(typeof packageJson.version === "string", "package.json is missing version");
+assert(
+  typeof packageJson.version === "string",
+  "package.json is missing version",
+);
 assert(
   packageJson.bin && typeof packageJson.bin === "object",
   "package.json is missing bin",
 );
-assert(npmExecPath, "npm_execpath is required; run this smoke check through npm");
+assert(
+  npmExecPath,
+  "npm_execpath is required; run this smoke check through npm",
+);
 
 const binEntries = Object.entries(packageJson.bin);
-assert(binEntries.length === 1, "package.json must expose exactly one CLI binary");
+assert(
+  binEntries.length === 1,
+  "package.json must expose exactly one CLI binary",
+);
 const [binName, binRelativePath] = binEntries[0];
 assert(
   typeof binRelativePath === "string",
@@ -150,9 +166,16 @@ async function smokeInstalledServer(cliPath) {
   });
 
   try {
-    const url = await waitForUrl(child, () => stdout, () => stderr);
+    const url = await waitForUrl(
+      child,
+      () => stdout,
+      () => stderr,
+    );
     const response = await fetch(url);
-    assert(response.status === 200, `packaged GET / returned ${response.status}`);
+    assert(
+      response.status === 200,
+      `packaged GET / returned ${response.status}`,
+    );
     assert(
       response.headers
         .get("content-security-policy")
@@ -173,7 +196,10 @@ async function smokeInstalledServer(cliPath) {
       child.kill("SIGINT");
       const exit = await waitForExit(child, stderr);
       assert(exit.code === 0, `packaged CLI exited with ${exit.code}`);
-      assert(exit.signal === null, `packaged CLI exited from signal ${exit.signal}`);
+      assert(
+        exit.signal === null,
+        `packaged CLI exited from signal ${exit.signal}`,
+      );
     }
 
     completed = true;
