@@ -6,7 +6,7 @@
     "moduleResolution": "NodeNext",
     "types": ["node"],
     "rootDir": "src/cli",
-    "outDir": "dist/cli",
+    "outDir": "cli",
     "noEmit": false,
     "noEmitOnError": true
   },
