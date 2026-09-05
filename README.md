@@ -39,9 +39,11 @@ The project includes a local browser UI and a React-independent core for ZIP
 validation, metadata/categories, search, lazy SVG previews, and original-file
 downloads. The UI supports local package selection/replacement, recursive category
 browsing, debounced search, responsive navigation, details dialogs, and keyboard
-interaction. The production localhost CLI/server and release automation are still
-pending. The npm package remains private until publication setup resolves the
-scope and packaging requirements.
+interaction. The production localhost CLI/static server is implemented with
+loopback-only binding, Host/path validation, restrictive browser security headers,
+and clean shutdown behavior. Release automation and npm publication setup remain
+pending. The npm package stays private until publication setup resolves the scope
+and packaging requirements.
 
 See the [core integration notes](./docs/icon-package-core.md) for its API and
 validation boundaries. Official-package verification remains pending as recorded
@@ -77,12 +79,15 @@ npm run check
 npm run typecheck
 npm test
 npm run build
+npm run test:cli-smoke
 npm run preview
 ```
 
 `check:fix` applies Biome fixes; `test:watch` runs Vitest interactively. `build`
-typechecks the project and writes the web UI to `dist/`. `preview` is a development
-tool for inspecting that build, not the planned production CLI/server.
+typechecks the project, writes the Web UI to `dist/`, and compiles the production
+CLI to `cli/`. After a build, `node cli/index.js` exercises the same localhost
+server path that the package binary uses. `preview` is a Vite development tool for
+inspecting the Web build and is not the production CLI/server.
 
 ## Project documents
 
