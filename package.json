@@ -12,6 +12,7 @@
     "cli",
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"
   ],
@@ -25,11 +26,17 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.cli.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "playwright test tests/e2e/visual.spec.mjs --update-snapshots",
     "build:cli": "tsc -p tsconfig.cli.json",
     "build": "node scripts/clean-build.mjs && npm run typecheck && vite build && npm run build:cli",
     "preview": "vite preview",
     "test:cli-smoke": "node scripts/cli-smoke.mjs",
-    "test:cli-package-smoke": "node scripts/cli-package-smoke.mjs"
+    "test:cli-package-smoke": "node scripts/cli-package-smoke.mjs",
+    "verify:package": "node scripts/validate-package.mjs",
+    "verify:official": "node scripts/verify-official.mjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",
