@@ -11,6 +11,7 @@ Before making changes, read:
 3. `CONTRIBUTING.md` — contribution workflow.
 4. `COMPATIBILITY.md` when changing ZIP/parser/search compatibility behavior.
 5. `SECURITY.md` when changing ZIP, SVG, localhost server, browser security, or dependency behavior.
+6. `docs/UI_REVIEW.md` when changing browser UI or visual-review infrastructure.
 
 `DESIGN.md` is authoritative for current design. This repository intentionally does not use ADRs for MVP.
 
@@ -42,6 +43,8 @@ Avoid speculative abstractions and future-proofing that are not required for MVP
 - Follow the visual direction and prohibited patterns in `DESIGN.md`.
 - Preserve keyboard/focus behavior and responsive behavior.
 - Use semantic design tokens instead of scattering raw colors.
+- For UI-affecting PRs, treat the `UI Review` Playwright screenshots as the standard visual QA artifact once the browser UI is present on `main`.
+- Use the manual GitHub Pages preview only when an interactive cross-device review is useful; it is development infrastructure, not a product distribution mode.
 
 ## Domain architecture
 
@@ -70,6 +73,8 @@ npm run build
 ```
 
 For changes affecting the CLI/server or end-to-end flow, run the relevant Playwright/CLI smoke tests as well.
+
+For browser UI changes, inspect the actual screenshots produced by `.github/workflows/ui-review.yml`; do not infer visual correctness from source code or unit tests alone. The workflow must use only project-owned dummy SVG/ZIP fixtures. See `docs/UI_REVIEW.md`.
 
 Core logic must maintain the coverage gates defined in `DESIGN.md`.
 
