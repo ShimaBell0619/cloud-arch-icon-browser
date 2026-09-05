@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { choosePackageFile } from "./package-file-picker";
 
-function browserWindow(
-  overrides: Partial<{
-    isSecureContext: boolean;
-    showOpenFilePicker: (...args: unknown[]) => Promise<readonly unknown[]>;
-  }> = {},
-) {
+type PickerWindow = NonNullable<
+  Parameters<typeof choosePackageFile>[0]["browserWindow"]
+>;
+
+function browserWindow(overrides: Partial<PickerWindow> = {}): PickerWindow {
   return {
     isSecureContext: true,
     ...overrides,
