@@ -11,19 +11,31 @@ As of 2026-09-06, the official Microsoft Learn page links to:
 - Package: `Azure_Public_Service_Icons_V24.zip`
 - Official page: https://learn.microsoft.com/en-us/azure/architecture/icons/
 - Microsoft Learn page last updated: 2026-07-09
-- Manual compatibility verification: **Pending**
+- Manual compatibility verification: **PASS**
 
-Release gate: PENDING
+Release gate: PASS
 
-The project must not claim `V24` as formally supported until the actual ZIP has been downloaded by the maintainer and successfully processed by the release verification command. The npm release gate rejects an activated public release unless this exact line is changed to `Release gate: PASS` after a successful verification.
+`Azure_Public_Service_Icons_V24.zip` has been downloaded separately by the maintainer and successfully processed by the development-only release verifier, which reuses the production `IconPackageSession.open` parser/validator. The Microsoft ZIP/SVG assets themselves are not committed or packaged by this project.
 
 ## Last successful verification
 
-No official package has been formally verified yet. This remains a required pre-release action for `v0.1.0`.
+```text
+Verification date (UTC): 2026-09-05
+Package: Azure_Public_Service_Icons_V24.zip
+Result: PASS
+Archive entries: 716
+Browsable SVG icons: 714
+Categories: 30
+Naming-convention match: 99.9%
+Hidden packaging root: Azure_Public_Service_Icons
+Notes: Successfully processed by the production IconPackageSession parser/validator. Verification was run by the maintainer from the separately downloaded official V24 ZIP; no Microsoft icon assets were added to the repository.
+```
+
+The verifier records its date in UTC. This verification was performed during the maintainer's 2026-09-06 JST release-readiness session.
 
 ## Verification procedure
 
-Before a release that claims compatibility:
+Before a future release that claims compatibility with a newer current package:
 
 1. Download the latest official ZIP directly from the Microsoft Learn page.
 2. Do not add the ZIP to this repository.
@@ -37,20 +49,23 @@ Before a release that claims compatibility:
    - verification date,
    - official ZIP filename,
    - Microsoft page update date/package observation,
+   - archive entry count,
    - browsable SVG/icon count,
    - category count,
    - naming-convention match rate,
+   - hidden packaging root,
    - validation result,
    - any compatibility notes.
-5. When the current official ZIP passes and the recorded metadata is accurate, change `Release gate: PENDING` to `Release gate: PASS`.
+5. Set the release gate to `PASS` only when the current official ZIP passes and the recorded metadata is accurate.
 6. Commit only the metadata in this file, never Microsoft icon assets.
 
 ## Verification record template
 
 ```text
-Verification date: YYYY-MM-DD
+Verification date (UTC): YYYY-MM-DD
 Package: Azure_Public_Service_Icons_VNN.zip
 Result: PASS | FAIL
+Archive entries: N
 Browsable SVG icons: N
 Categories: N
 Naming-convention match: NN.N%
