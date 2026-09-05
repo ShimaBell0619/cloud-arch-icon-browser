@@ -3,10 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
 import {
-  IconPackageSession,
-  IconSearchIndex,
   type IconCategory,
   type IconEntry,
+  IconPackageSession,
+  IconSearchIndex,
   type PackageMetadata,
   type PackageProblem,
 } from "@/core";
@@ -83,7 +83,9 @@ const metadata: PackageMetadata = {
 
 function createFakeSession(options: { throwOnSearch?: boolean } = {}) {
   const index = new IconSearchIndex(icons);
-  const session: IconPackageSession = Object.create(IconPackageSession.prototype);
+  const session: IconPackageSession = Object.create(
+    IconPackageSession.prototype,
+  );
   const dispose = vi.fn(async () => undefined);
   const getPreviewUrl = vi.fn(async (id: string) => `blob:preview-${id}`);
   const getDownload = vi.fn(async (id: string) => {
@@ -145,7 +147,9 @@ describe("icon browser UI", () => {
       }),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Choose ZIP" })).toBeVisible();
-    expect(screen.getByText(/processed locally for this session only/i)).toBeVisible();
+    expect(
+      screen.getByText(/processed locally for this session only/i),
+    ).toBeVisible();
 
     const link = screen.getByRole("link", { name: /Get official icons/ });
     expect(link).toHaveAttribute(
@@ -162,14 +166,22 @@ describe("icon browser UI", () => {
     render(<App />);
     await loadDummyPackage(user);
 
-    expect(screen.getByRole("button", { name: "App Service, Compute" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "SQL, Compute/Databases" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Blob Storage, Storage" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "App Service, Compute" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "SQL, Compute/Databases" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Blob Storage, Storage" }),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: /^All 3$/ })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(screen.queryByRole("button", { name: /^Databases 1$/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Databases 1$/ }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Expand Compute" }));
     expect(screen.getByRole("button", { name: /^Databases 1$/ })).toBeVisible();
@@ -181,7 +193,9 @@ describe("icon browser UI", () => {
         screen.queryByRole("button", { name: "App Service, Compute" }),
       ).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: "Blob Storage, Storage" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Blob Storage, Storage" }),
+    ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: /^Compute 2$/ }));
     expect(search).toHaveValue("blob");
@@ -189,8 +203,12 @@ describe("icon browser UI", () => {
       await screen.findByRole("heading", { name: "No icons found" }),
     ).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: "Search all categories" }));
-    expect(await screen.findByRole("button", { name: "Blob Storage, Storage" })).toBeVisible();
+    await user.click(
+      screen.getByRole("button", { name: "Search all categories" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Blob Storage, Storage" }),
+    ).toBeVisible();
   });
 
   it("supports the slash shortcut and keeps search focus when clearing", async () => {
@@ -230,7 +248,9 @@ describe("icon browser UI", () => {
     expect(anchorClick).toHaveBeenCalledTimes(1);
 
     await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     await waitFor(() => expect(card).toHaveFocus());
   });
 
@@ -246,8 +266,12 @@ describe("icon browser UI", () => {
       invalid,
     );
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("The ZIP is corrupt.");
-    expect(screen.getByRole("button", { name: "App Service, Compute" })).toBeVisible();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The ZIP is corrupt.",
+    );
+    expect(
+      screen.getByRole("button", { name: "App Service, Compute" }),
+    ).toBeVisible();
     expect(screen.getAllByText("dummy-icons.zip").length).toBeGreaterThan(0);
     expect(dispose).not.toHaveBeenCalled();
   });
@@ -266,7 +290,9 @@ describe("icon browser UI", () => {
     });
 
     expect(
-      screen.getByText("A package is already loaded. Use Change package to replace it."),
+      screen.getByText(
+        "A package is already loaded. Use Change package to replace it.",
+      ),
     ).toBeVisible();
     expect(open).toHaveBeenCalledTimes(1);
   });
@@ -286,6 +312,8 @@ describe("icon browser UI", () => {
     await user.click(screen.getByRole("button", { name: "Reset workspace" }));
 
     expect(dispose).toHaveBeenCalledTimes(1);
-    expect(await screen.findByRole("button", { name: "Choose ZIP" })).toBeVisible();
+    expect(
+      await screen.findByRole("button", { name: "Choose ZIP" }),
+    ).toBeVisible();
   });
 });
