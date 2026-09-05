@@ -53,7 +53,6 @@ export function CategoryTree({
           <CategoryNode
             key={category.id}
             category={category}
-            level={0}
             expanded={expanded}
             selectedCategory={selectedCategory}
             onToggle={toggle}
@@ -67,7 +66,6 @@ export function CategoryTree({
 
 interface CategoryNodeProps {
   category: IconCategory;
-  level: number;
   expanded: ReadonlySet<string>;
   selectedCategory: string | null;
   onToggle: (id: string) => void;
@@ -76,7 +74,6 @@ interface CategoryNodeProps {
 
 function CategoryNode({
   category,
-  level,
   expanded,
   selectedCategory,
   onToggle,
@@ -89,10 +86,7 @@ function CategoryNode({
 
   return (
     <li>
-      <div
-        className="flex min-w-0 items-center gap-0.5"
-        style={{ paddingInlineStart: `${level * 12}px` }}
-      >
+      <div className="flex min-w-0 items-center gap-0.5">
         {hasChildren ? (
           <button
             type="button"
@@ -128,12 +122,11 @@ function CategoryNode({
         </button>
       </div>
       {hasChildren && isExpanded ? (
-        <ul id={childrenId} className="mt-1 space-y-1">
+        <ul id={childrenId} className="mt-1 space-y-1 pl-3">
           {category.children.map((child) => (
             <CategoryNode
               key={child.id}
               category={child}
-              level={level + 1}
               expanded={expanded}
               selectedCategory={selectedCategory}
               onToggle={onToggle}
