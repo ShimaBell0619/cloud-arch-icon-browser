@@ -15,7 +15,7 @@ export class AppErrorBoundary extends Component<
   AppErrorBoundaryProps,
   AppErrorBoundaryState
 > {
-  state: AppErrorBoundaryState = { error: null };
+  override state: AppErrorBoundaryState = { error: null };
 
   static getDerivedStateFromError(error: unknown): AppErrorBoundaryState {
     return {
