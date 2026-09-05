@@ -22,7 +22,7 @@ GitHub Pages must be enabled once in repository settings:
 1. Open **Settings → Pages**.
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 
-The workflow keeps a generated `pages-content` branch as persistent build storage. GitHub Pages itself remains configured to deploy through GitHub Actions; the generated branch is not the Pages publishing source.
+The workflow keeps a generated `pages-content` branch as persistent build storage. GitHub Pages itself remains configured to deploy through GitHub Actions; the generated branch is not the Pages publishing source. `pages-content` is automation-owned generated output and should not be edited manually.
 
 Main deployments continue to use the protected `github-pages` environment. Same-repository PR publish/cleanup jobs use a separate `github-pages-preview` environment so the default branch-only protection on `github-pages` can remain intact. Fork PRs never enter the write-capable preview environment.
 
