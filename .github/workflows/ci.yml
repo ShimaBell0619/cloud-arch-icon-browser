@@ -88,6 +88,8 @@ jobs:
         run: npm run test:cli-package-smoke
       - if: steps.changes.outputs.code_changed == 'true'
         run: npm run verify:package
+      - if: steps.changes.outputs.code_changed == 'true'
+        run: npm run verify:release-ready
 
   browser-e2e:
     name: Browser E2E / a11y / visual
