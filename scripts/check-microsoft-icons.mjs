@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { appendFileSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -43,7 +44,6 @@ if (writeBaselinePath) {
   process.exit(0);
 }
 
-const { readFile } = await import("node:fs/promises");
 const baseline = JSON.parse(await readFile(DEFAULT_BASELINE, "utf8"));
 const changes = [];
 
@@ -85,7 +85,6 @@ const report = changed
 await writeFile(reportPath, report, "utf8");
 writeGithubOutput("changed", String(changed));
 writeGithubOutput("report_path", reportPath);
-
 console.log(report);
 
 function observePage(source) {
@@ -102,7 +101,10 @@ function observePage(source) {
   }
 
   const packageUrl = uniqueZips[0];
-  const packageFilename = decodeURIComponent(new URL(packageUrl).pathname.split("/").pop());
+  const encodedFilename = new URL(packageUrl).pathname.split("/").pop();
+  if (!encodedFilename) throw new Error("Official ZIP URL did not contain a filename.");
+
+  const packageFilename = decodeURIComponent(encodedFilename);
   const generalGuidelines = extractSectionText(source, "general-guidelines");
   const iconTerms = extractSectionText(source, "icon-terms");
 
@@ -167,14 +169,5 @@ function escapeRegExp(value) {
 
 function writeGithubOutput(name, value) {
   if (!process.env.GITHUB_OUTPUT) return;
-  const { appendFileSync } = requireFsSync();
   appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${value}\n`, "utf8");
-}
-
-function requireFsSync() {
-  // Keep the watcher ESM-only while avoiding a second top-level static fs import.
-  return { appendFileSync: (file, data, encoding) => {
-    const fd = process.getBuiltinModule("node:fs");
-    fd.appendFileSync(file, data, encoding);
-  } };
 }
