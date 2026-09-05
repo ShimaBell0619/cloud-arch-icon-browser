@@ -112,9 +112,10 @@ No ZIP path argument, verbose mode, custom host, custom port, or `--no-open` opt
 
 ## 3. Platform and runtime
 
-- Node.js minimum: 24.
-- Development and CI use one specific Node 24 version via `.node-version`.
-- `package.json` runtime engine: `>=24`.
+- Supported Node.js runtime: `^22.22.2 || ^24.15.0 || >=26.0.0`.
+- Node 25.x is unsupported by the current dependency set.
+- Development and CI use Node 24.20.0 via `.node-version`.
+- `package.json` runtime engine must match the supported range above.
 - Supported operating systems: Windows, macOS, Linux.
 - Package is ESM-only (`"type": "module"`).
 - Package manager: npm.
