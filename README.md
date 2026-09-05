@@ -8,13 +8,13 @@ Cloud Arch Icon Browser is an independent open-source project. It is not affilia
 
 Microsoft Azure Architecture Icons are **not included** in this repository or npm package. Users download the latest official icon package directly from Microsoft and use those icons in accordance with Microsoft's terms.
 
-## Planned usage
+## Usage
 
 ```bash
-npx @<npm-scope>/cloud-arch-icon-browser
+npx @shimabell0619/cloud-arch-icon-browser
 ```
 
-The final npm scope is intentionally unresolved until the first-publication bootstrap. The command starts a temporary HTTP server bound to `127.0.0.1` on an available port and opens the local web UI in the default browser. The ZIP selected by the user is processed locally and is not uploaded or persisted by the application.
+The command starts a temporary HTTP server bound to `127.0.0.1` on an available port and opens the local web UI in the default browser. The ZIP selected by the user is processed locally and is not uploaded or persisted by the application.
 
 ## MVP goals
 
@@ -37,7 +37,7 @@ The app may provide manual links to Microsoft documentation, but it does not aut
 
 The project includes a local browser UI and a React-independent core for ZIP validation, metadata/categories, search, lazy SVG previews, and original-file downloads. The UI supports local package selection/replacement, recursive category browsing, debounced search, responsive navigation, details dialogs, and keyboard interaction. The production localhost CLI/static server is implemented with loopback-only binding, Host/path validation, restrictive browser security headers, and clean shutdown behavior.
 
-Release-readiness automation now covers Linux browser E2E/accessibility/visual regression, Linux build/package checks, Windows/macOS packaged CLI smoke tests, `npm pack` leak validation, Changesets release PRs, an OIDC npm release workflow, and a weekly Microsoft source-change watcher. Actual npm publication remains disabled with `private: true` until the final npm scope/bootstrap is completed. The current official Microsoft ZIP also still requires the manual production-parser verification recorded in [`COMPATIBILITY.md`](./COMPATIBILITY.md).
+Release-readiness automation covers Linux browser E2E/accessibility/visual regression, Linux build/package checks, Windows/macOS packaged CLI smoke tests, `npm pack` leak validation, Changesets release PRs, an OIDC npm release workflow, and a weekly Microsoft source-change watcher. The npm package name is `@shimabell0619/cloud-arch-icon-browser`; publication is activated with `private: false`. The current official Microsoft ZIP still requires the maintainer verification recorded in [`COMPATIBILITY.md`](./COMPATIBILITY.md) before `v0.1.0` can be released.
 
 See the [core integration notes](./docs/icon-package-core.md) for its API and validation boundaries and [`docs/RELEASE.md`](./docs/RELEASE.md) for the release/bootstrap runbook.
 
