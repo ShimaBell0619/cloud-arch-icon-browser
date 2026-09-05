@@ -13,7 +13,7 @@ Before making changes, read:
 5. `SECURITY.md` when changing ZIP, SVG, localhost server, browser security, or dependency behavior.
 6. `docs/UI_REVIEW.md` when changing browser UI or visual-review infrastructure.
 
-`DESIGN.md` is authoritative for current design. This repository intentionally does not use ADRs for MVP.
+`DESIGN.md` is authoritative for the current design. Decision history lives in Issues, PRs, and Git history; the repository intentionally does not maintain a separate ADR set.
 
 ## Non-negotiable rules
 
@@ -23,8 +23,8 @@ Before making changes, read:
 - Do not edit, optimize, recolor, sanitize-for-download, rename, or otherwise rewrite original Microsoft SVG bytes.
 - Do not inject untrusted SVG markup into the DOM with `innerHTML` or equivalent APIs.
 - Keep the local server bound to `127.0.0.1` only unless an explicit design change is approved.
-- Do not add hosted-service/backend/database/account functionality in MVP.
-- Do not add out-of-scope distribution channels.
+- Do not add hosted-service/backend/database/account functionality unless an explicit design change is approved.
+- Do not add a new distribution channel unless it is explicitly approved and documented.
 - Do not change foundational architecture, security policy, UX policy, publication model, or core technology choices silently.
 
 If implementation conflicts with `DESIGN.md`, stop that design change, explain the conflict in the Issue/PR, recommend a resolution, and wait for explicit approval.
@@ -33,7 +33,7 @@ If implementation conflicts with `DESIGN.md`, stop that design change, explain t
 
 You may decide normal implementation details that do not change the design contract. Prefer the simplest implementation consistent with `DESIGN.md`.
 
-Avoid speculative abstractions and future-proofing that are not required for MVP.
+Avoid speculative abstractions and future-proofing that are not required by the approved change or current design.
 
 ## UI implementation
 
@@ -43,7 +43,7 @@ Avoid speculative abstractions and future-proofing that are not required for MVP
 - Follow the visual direction and prohibited patterns in `DESIGN.md`.
 - Preserve keyboard/focus behavior and responsive behavior.
 - Use semantic design tokens instead of scattering raw colors.
-- For UI-affecting PRs, treat the `UI Review` Playwright screenshots as the standard visual QA artifact once the browser UI is present on `main`.
+- For UI-affecting PRs, treat the `UI Review` Playwright screenshots as the standard visual QA artifact.
 - Use the manual GitHub Pages preview only when an interactive cross-device review is useful; it is development infrastructure, not a product distribution mode.
 
 ## Domain architecture
@@ -59,11 +59,11 @@ Avoid speculative abstractions and future-proofing that are not required for MVP
 - Pin direct dependency versions exactly.
 - Do not introduce a major/foundational dependency without explicit approval.
 - No CDN/runtime-hosted dependencies.
-- Preserve ESM-only and Node.js 24+ requirements.
+- Preserve ESM-only and the Node.js engine range defined by `package.json`.
 
 ## Tests and validation
 
-Before declaring work complete, run the checks relevant to the change. Once scripts exist, the expected baseline is conceptually:
+Before declaring work complete, run the checks relevant to the change. The baseline is:
 
 ```bash
 npm run check
@@ -85,7 +85,7 @@ Do not use Microsoft assets as test fixtures. Generate project-owned dummy ZIP/S
 - Work from a short-lived branch.
 - PR title follows Conventional Commits.
 - Keep scope aligned with the assigned Issue.
-- Include an appropriate Changeset for release-relevant changes once Changesets is configured.
+- Include an appropriate Changeset for release-relevant changes; docs/internal-only changes do not need one unless they alter packaged/user-visible release content.
 - State whether the PR changes `DESIGN.md`.
 - State the validation performed.
 - Confirm no Microsoft assets were added.
@@ -96,5 +96,7 @@ Do not implement unrelated future features in the same PR.
 ## Release safety
 
 Before npm publication, verify package contents (`npm pack --dry-run` or equivalent CI validation) so Microsoft assets, local ZIPs, test fixtures, and unrelated files cannot leak into the package.
+
+Normal publication uses npm Trusted Publishing/OIDC from GitHub Actions; do not add a long-lived npm publish token.
 
 Official-package verification is a maintainer/release task using a locally downloaded Microsoft ZIP. Never commit that ZIP.
