@@ -14,9 +14,9 @@ import {
   type IconEntry,
   IconPackageSession,
   IconSearchIndex,
-  PERSISTENCE_KEY,
   type PackageMetadata,
   type PackageProblem,
+  PERSISTENCE_KEY,
 } from "@/core";
 
 const icons: readonly IconEntry[] = [
@@ -222,8 +222,12 @@ describe("icon browser UI", () => {
       within(navigation).getByRole("button", { name: "Favorites" }),
     ).toHaveAttribute("aria-current", "page");
 
-    await user.click(within(navigation).getByRole("button", { name: "Recent" }));
-    expect(await screen.findByRole("heading", { name: "Recent" })).toBeVisible();
+    await user.click(
+      within(navigation).getByRole("button", { name: "Recent" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Recent" }),
+    ).toBeVisible();
 
     await user.click(
       within(navigation).getByRole("button", { name: "All icons" }),
@@ -240,14 +244,18 @@ describe("icon browser UI", () => {
     await loadDummyPackage(user);
 
     await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
-    expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Expand sidebar" }),
+    ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Dark theme" }));
     expect(document.documentElement.dataset.theme).toBe("dark");
 
     const stored = JSON.parse(
       window.localStorage.getItem(PERSISTENCE_KEY) ?? "null",
-    ) as { preferences?: { sidebarCollapsed?: boolean; theme?: string } } | null;
+    ) as {
+      preferences?: { sidebarCollapsed?: boolean; theme?: string };
+    } | null;
     expect(stored?.preferences).toMatchObject({
       sidebarCollapsed: true,
       theme: "dark",

@@ -79,7 +79,9 @@ export function App() {
   );
   const [loadPhase, setLoadPhase] = useState<LoadPhase | null>(null);
   const [loadError, setLoadError] = useState<PackageProblem | null>(null);
-  const [persistedState, setPersistedState] = useState(readInitialPersistedState);
+  const [persistedState, setPersistedState] = useState(
+    readInitialPersistedState,
+  );
 
   useAppliedTheme(persistedState.preferences.theme);
 
@@ -716,7 +718,9 @@ function DesktopSidebar({
         <BrandMark compact />
         {!collapsed ? (
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">Cloud Arch Icon Browser</p>
+            <p className="truncate text-sm font-semibold">
+              Cloud Arch Icon Browser
+            </p>
             <p className="text-xs text-muted-foreground">Local workspace</p>
           </div>
         ) : null}
@@ -736,7 +740,9 @@ function DesktopSidebar({
         </Button>
       </div>
 
-      <div className={`min-h-0 flex-1 overflow-y-auto ${collapsed ? "p-2" : "p-3"}`}>
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto ${collapsed ? "p-2" : "p-3"}`}
+      >
         <WorkspaceNavigation
           label="Workspace"
           categories={categories}
@@ -781,11 +787,15 @@ function DesktopSidebar({
             <RefreshCwIcon aria-hidden="true" />
           )}
           {!collapsed ? (
-            <span>{loadPhase ? LOAD_PHASE_LABELS[loadPhase] : "Change package"}</span>
+            <span>
+              {loadPhase ? LOAD_PHASE_LABELS[loadPhase] : "Change package"}
+            </span>
           ) : null}
         </Button>
 
-        <div className={collapsed ? "mt-2" : "mt-3 border-t border-border pt-3"}>
+        <div
+          className={collapsed ? "mt-2" : "mt-3 border-t border-border pt-3"}
+        >
           <ThemeControl
             preference={theme}
             compact={collapsed}
@@ -890,7 +900,9 @@ function WorkspaceNavigation({
             totalIcons={totalIcons}
             selectedCategory={selectedCategory}
             showAll={false}
-            onSelect={(categoryId) => navigate(() => onSelectCategory(categoryId))}
+            onSelect={(categoryId) =>
+              navigate(() => onSelectCategory(categoryId))
+            }
           />
         </div>
       ) : null}
@@ -903,8 +915,8 @@ interface WorkspaceNavButtonProps {
   icon: ReactNode;
   active: boolean;
   collapsed: boolean;
-  expanded?: boolean;
-  trailing?: ReactNode;
+  expanded?: boolean | undefined;
+  trailing?: ReactNode | undefined;
   onClick: () => void;
 }
 
@@ -1035,7 +1047,10 @@ function NavigationSheet({
             <BrandMark compact />
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Local workspace</p>
-              <h2 id="navigation-sheet-title" className="truncate font-semibold">
+              <h2
+                id="navigation-sheet-title"
+                className="truncate font-semibold"
+              >
                 Navigation
               </h2>
             </div>
@@ -1097,7 +1112,9 @@ function NavigationSheet({
             ) : (
               <RefreshCwIcon aria-hidden="true" />
             )}
-            <span>{loadPhase ? LOAD_PHASE_LABELS[loadPhase] : "Change package"}</span>
+            <span>
+              {loadPhase ? LOAD_PHASE_LABELS[loadPhase] : "Change package"}
+            </span>
           </Button>
           <div className="mt-3 border-t border-border pt-3">
             <ThemeControl preference={theme} onChange={onThemeChange} />
@@ -1136,11 +1153,8 @@ function ThemeControl({
           Theme
         </p>
       ) : null}
-      <div
-        role="group"
-        aria-label="Theme"
-        className={compact ? "space-y-1" : "grid grid-cols-3 gap-1"}
-      >
+      <fieldset className={compact ? "space-y-1" : "grid grid-cols-3 gap-1"}>
+        <legend className="sr-only">Theme</legend>
         {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
           const selected = preference === value;
           return (
@@ -1158,12 +1172,16 @@ function ThemeControl({
             </button>
           );
         })}
-      </div>
+      </fieldset>
     </div>
   );
 }
 
-function WorkspacePlaceholder({ view }: { view: Exclude<WorkspaceView, "all"> }) {
+function WorkspacePlaceholder({
+  view,
+}: {
+  view: Exclude<WorkspaceView, "all">;
+}) {
   const favorites = view === "favorites";
   const Icon = favorites ? StarIcon : Clock3Icon;
 
