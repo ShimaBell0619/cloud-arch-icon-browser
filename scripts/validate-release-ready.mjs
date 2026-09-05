@@ -11,9 +11,13 @@ if (packageJson.private === true) {
 }
 
 const failures = [];
+const expectedPackageName = "@shimabell06/cloud-arch-icon-browser";
 const expectedRepository =
   "https://github.com/ShimaBell0619/cloud-arch-icon-browser.git";
 
+if (packageJson.name !== expectedPackageName) {
+  failures.push(`package name must be exactly ${expectedPackageName}`);
+}
 if (!/^@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/u.test(packageJson.name)) {
   failures.push("package name must be a final scoped npm name (@scope/name)");
 }

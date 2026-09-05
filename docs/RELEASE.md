@@ -7,7 +7,7 @@ This project uses Changesets for release intent and GitHub Actions for publicati
 The final npm package name is:
 
 ```text
-@shimabell0619/cloud-arch-icon-browser
+@shimabell06/cloud-arch-icon-browser
 ```
 
 The v0.1.0 publication PR sets `private=false` and `publishConfig.access=public`. The current official `Azure_Public_Service_Icons_V24.zip` has passed the production-parser verification recorded in `COMPATIBILITY.md`, so the compatibility release gate is now `PASS`.
@@ -24,7 +24,7 @@ For future Microsoft package updates, download the current official ZIP separate
 
 ## One-time npm bootstrap
 
-A Trusted Publisher is configured against an npm package that already exists. For the first publication of `@shimabell0619/cloud-arch-icon-browser`, create the registry package once without consuming the intended `v0.1.0` release.
+A Trusted Publisher is configured against an npm package that already exists. For the first publication of `@shimabell06/cloud-arch-icon-browser`, create the registry package once without consuming the intended `v0.1.0` release.
 
 Use a disposable clean copy/worktree. Do not commit the bootstrap version to the repository.
 
@@ -69,7 +69,7 @@ Use a disposable clean copy/worktree. Do not commit the bootstrap version to the
    With a current npm CLI, the equivalent interactive configuration can be performed with:
 
    ```bash
-   npm trust github @shimabell0619/cloud-arch-icon-browser \
+   npm trust github @shimabell06/cloud-arch-icon-browser \
      --repo ShimaBell0619/cloud-arch-icon-browser \
      --file release.yml \
      --allow-publish
