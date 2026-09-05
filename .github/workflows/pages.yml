@@ -68,7 +68,7 @@ jobs:
       issues: write
       pull-requests: write
     environment:
-      name: github-pages
+      name: ${{ github.event_name == 'pull_request' && 'github-pages-preview' || 'github-pages' }}
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -225,7 +225,7 @@ jobs:
       id-token: write
       issues: write
     environment:
-      name: github-pages
+      name: github-pages-preview
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Remove preview from persistent Pages content
