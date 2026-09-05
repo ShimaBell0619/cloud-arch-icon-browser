@@ -14,7 +14,6 @@ import {
   FolderArchiveIcon,
   FolderTreeIcon,
   LoaderCircleIcon,
-  PackageCheckIcon,
   RefreshCwIcon,
   SearchIcon,
   UploadIcon,
@@ -27,6 +26,7 @@ import { LazyIconPreview } from "@/components/lazy-icon-preview";
 import { Button } from "@/components/ui/button";
 import {
   IconPackageSession,
+  type IconCategory,
   type IconEntry,
   type PackageProblem,
 } from "@/core";
@@ -114,7 +114,10 @@ export function App() {
     }));
     setLoadError(null);
     setLoadPhase(null);
-    if (previous !== candidate.session) disposeQuietly(previous);
+
+    if (previous !== candidate.session) {
+      window.setTimeout(() => disposeQuietly(previous), 0);
+    }
   }, []);
 
   return (
@@ -281,7 +284,7 @@ function LoadPhases({ active }: { active: LoadPhase }) {
             className={`size-2 rounded-full ${index <= activeIndex ? "bg-primary" : "bg-muted"}`}
           />
           <span className={index === activeIndex ? "font-medium text-foreground" : ""}>
-            {phase[0]?.toUpperCase()}
+            {phase.charAt(0).toUpperCase()}
             {phase.slice(1)}
           </span>
         </li>
@@ -613,7 +616,7 @@ function IconCard({ session, icon, onOpen }: IconCardProps) {
 interface CategorySheetProps {
   open: boolean;
   trigger: HTMLElement | null;
-  categories: readonly import("@/core").IconCategory[];
+  categories: readonly IconCategory[];
   totalIcons: number;
   selectedCategory: string | null;
   onSelect: (categoryId: string | null) => void;
