@@ -82,6 +82,23 @@ describe("persistence", () => {
     expect(parsed.recentSearches).toEqual(["App Service"]);
   });
 
+  it("normalizes parsed Recent icons to newest-first ordering", () => {
+    let state = createDefaultPersistedState();
+    state = recordRecentIcon(state, icon(1), 100);
+    state = recordRecentIcon(state, icon(2), 200);
+
+    const parsed = parsePersistedState(
+      JSON.stringify({
+        ...state,
+        recentIcons: [...state.recentIcons].reverse(),
+      }),
+    );
+
+    expect(parsed.recentIcons.map((recent) => recent.openedAt)).toEqual([
+      200, 100,
+    ]);
+  });
+
   it("round-trips through a storage-like boundary", () => {
     const storage = new MemoryStorage();
     const state = setPersistedPreferences(createDefaultPersistedState(), {
