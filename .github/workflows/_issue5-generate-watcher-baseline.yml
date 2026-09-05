@@ -1,0 +1,33 @@
+name: Issue 5 watcher baseline generation
+
+on:
+  push:
+    branches: [chore/issue-5-release-readiness]
+    paths:
+      - ".github/workflows/_issue5-generate-watcher-baseline.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: chore/issue-5-release-readiness
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - name: Observe current official Microsoft page
+        run: node scripts/check-microsoft-icons.mjs --write-baseline .github/microsoft-icons-watch.json
+      - name: Commit watcher baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/microsoft-icons-watch.json
+          git commit -m "chore: record Microsoft icon watcher baseline"
+          git push origin HEAD:chore/issue-5-release-readiness
