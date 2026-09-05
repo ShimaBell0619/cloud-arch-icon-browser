@@ -91,7 +91,7 @@ describe("startStaticServer", () => {
     const unexpected = await rawRequest(server.port, "/", "evil.example");
     expect(unexpected.statusCode).toBe(403);
 
-    const missing = await rawRequest(server.port, "/", "");
+    const missing = await rawRequest(server.port, "/", null);
     expect(missing.statusCode).toBe(403);
 
     const localhost = await rawRequest(
@@ -155,10 +155,10 @@ async function createFixture(): Promise<Fixture> {
 function rawRequest(
   port: number,
   path: string,
-  hostHeader: string,
+  hostHeader: string | null,
 ): Promise<RawResponse> {
   return new Promise((resolvePromise, rejectPromise) => {
-    const headers = hostHeader.length > 0 ? { Host: hostHeader } : { Host: "" };
+    const headers = hostHeader === null ? {} : { Host: hostHeader };
     const clientRequest = request(
       {
         host: "127.0.0.1",
@@ -166,6 +166,7 @@ function rawRequest(
         path,
         method: "GET",
         headers,
+        setHost: false,
       },
       (response) => {
         const chunks: Buffer[] = [];
