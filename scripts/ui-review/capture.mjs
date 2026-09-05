@@ -50,10 +50,10 @@ try {
     fullPage: true,
   });
 
-  await mobile.getByRole("button", { name: "Open categories" }).click();
-  await mobile.getByRole("dialog", { name: "Categories" }).waitFor();
+  await mobile.getByRole("button", { name: "Open navigation" }).click();
+  await mobile.getByRole("dialog", { name: "Navigation" }).waitFor();
   await mobile.screenshot({
-    path: `${output}/05-categories-mobile.png`,
+    path: `${output}/05-navigation-mobile.png`,
     fullPage: true,
   });
 
