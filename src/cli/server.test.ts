@@ -91,8 +91,10 @@ describe("startStaticServer", () => {
     const unexpected = await rawRequest(server.port, "/", "evil.example");
     expect(unexpected.statusCode).toBe(403);
 
+    // Node rejects HTTP/1.1 requests without Host at the parser boundary,
+    // before the request reaches our Host allowlist handler.
     const missing = await rawRequest(server.port, "/", null);
-    expect(missing.statusCode).toBe(403);
+    expect(missing.statusCode).toBe(400);
 
     const localhost = await rawRequest(
       server.port,
