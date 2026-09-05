@@ -21,6 +21,7 @@ Release gate: PASS
 
 ```text
 Verification date (UTC): 2026-09-05
+Maintainer session date (JST): 2026-09-06
 Package: Azure_Public_Service_Icons_V24.zip
 Result: PASS
 Archive entries: 716
@@ -31,7 +32,7 @@ Hidden packaging root: Azure_Public_Service_Icons
 Notes: Successfully processed by the production IconPackageSession parser/validator. Verification was run by the maintainer from the separately downloaded official V24 ZIP; no Microsoft icon assets were added to the repository.
 ```
 
-The verifier records its date in UTC. This verification was performed during the maintainer's 2026-09-06 JST release-readiness session.
+The verifier records its date in UTC, so a run performed after midnight in Japan can report the previous calendar date.
 
 ## Verification procedure
 
@@ -63,6 +64,7 @@ Before a future release that claims compatibility with a newer current package:
 
 ```text
 Verification date (UTC): YYYY-MM-DD
+Maintainer session date: YYYY-MM-DD
 Package: Azure_Public_Service_Icons_VNN.zip
 Result: PASS | FAIL
 Archive entries: N
