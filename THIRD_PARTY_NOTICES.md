@@ -42,6 +42,13 @@ Its unmodified license is retained in
 Vite copies both license files into `dist/licenses/`; refresh them from the
 installed packages when updating these dependencies.
 
+## CLI browser launch
+
+`open` 11.0.2 is distributed under the MIT License and is used only by the local
+CLI to ask the operating system to open the generated `127.0.0.1` URL in the
+user's default browser. It is not used by the Web UI and does not introduce an
+automatic external network request.
+
 ## Runtime and development dependencies
 
 Planned major open-source dependencies/tooling include, subject to implementation-time version selection and license verification:
@@ -54,6 +61,7 @@ Planned major open-source dependencies/tooling include, subject to implementatio
 - Zustand
 - Fuse.js
 - `@zip.js/zip.js`
+- `open`
 - Lucide
 - Sonner
 - Biome
