@@ -1,14 +1,16 @@
 # Cloud Arch Icon Browser — Design Contract
 
-Status: MVP design baseline for `v0.1.0`.
+Status: current design baseline. The first public release, `v0.1.0`, was completed on 2026-09-06 (JST).
 
-This document is the single source of truth for the current product, architecture, security, UX, testing, and release design. If implementation pressure conflicts with this document, do not silently change the design. Raise the conflict in an Issue or PR and obtain an explicit design decision first.
+This document is the source of truth for the current product, architecture, security, UX, testing, compatibility, and release design. It describes the behavior the repository is expected to preserve now; historical implementation planning is recorded separately near the end of this document.
+
+If implementation pressure conflicts with this document, do not silently change the design. Raise the conflict in an Issue or PR and obtain an explicit design decision first.
 
 ## 1. Product purpose
 
 Cloud Arch Icon Browser is a small local tool for browsing the official Microsoft Azure Architecture Icons package.
 
-The tool exists to make a user-downloaded official ZIP easier to navigate, search, preview, and download from without redistributing Microsoft assets.
+The tool makes a user-downloaded official ZIP easier to navigate, search, preview, and download from without redistributing Microsoft assets.
 
 The project is independent and must not imply Microsoft affiliation, endorsement, sponsorship, or official status.
 
@@ -31,11 +33,11 @@ https://learn.microsoft.com/en-us/azure/architecture/icons/
 
 The project must not copy Microsoft assets into the repository, npm package, screenshots used as fixtures, release artifacts, or tests.
 
-Microsoft's current published guidance includes restrictions against cropping, flipping, rotating, distorting, or changing icon shape. The application therefore treats SVG files as immutable source assets.
+Microsoft's published guidance includes restrictions against cropping, flipping, rotating, distorting, or changing icon shape. The application therefore treats SVG files as immutable source assets.
 
-### 1.3 Non-goals for MVP
+### 1.3 Current non-goals
 
-The following are explicitly out of scope for `v0.1.0`:
+The following are outside the current product baseline and require an explicit design decision before implementation:
 
 - Hosted/public web application.
 - Automatic download of the Microsoft icon package.
@@ -48,17 +50,17 @@ The following are explicitly out of scope for `v0.1.0`:
 - File System Access API persistence.
 - PWA or Service Worker.
 - Router/multiple pages.
-- Windows executable, macOS app, Homebrew, Chocolatey, winget, Docker image, or other distribution channel.
+- Windows executable, macOS app, Homebrew, Chocolatey, winget, Docker image, or another distribution channel.
 - Storybook.
 - Full formal WCAG audit.
 - Historical support guarantees for old Microsoft icon packages.
 - Generic multi-cloud abstraction.
 
-Future ideas must remain explicitly marked as future work and must not be implemented opportunistically during MVP work.
+Future ideas must remain explicitly marked as future work. Do not implement them opportunistically inside unrelated changes.
 
-## 2. Distribution and execution model
+## 2. Public identity and distribution
 
-### 2.1 Public identity
+### 2.1 Identity
 
 - Repository base name: `cloud-arch-icon-browser`.
 - npm package base name: `cloud-arch-icon-browser`.
@@ -69,15 +71,13 @@ Future ideas must remain explicitly marked as future work and must not be implem
 
 ### 2.2 Supported distribution
 
-MVP officially supports npm/npx only.
-
-Supported usage:
+The supported product distribution is npm/npx:
 
 ```bash
 npx @shimabell06/cloud-arch-icon-browser
 ```
 
-The package contains both the CLI and the prebuilt Web UI.
+The npm package contains both the CLI and the prebuilt Web UI.
 
 ### 2.3 Local server
 
@@ -95,12 +95,12 @@ The server is static-only:
 - `GET` and `HEAD` are supported.
 - Mutating HTTP methods return `405`.
 - No application API endpoints exist.
-- Path traversal must be rejected.
-- Host header validation must only permit the expected localhost/127.0.0.1 host and selected port.
+- Path traversal is rejected.
+- Host header validation permits only the expected localhost/127.0.0.1 host and selected port.
 
 ### 2.4 CLI surface
 
-MVP CLI supports only:
+The current CLI supports:
 
 - no arguments: start the app,
 - `-h`, `--help`,
@@ -108,7 +108,7 @@ MVP CLI supports only:
 
 Unknown options fail with exit code 1. Help/version exit with code 0.
 
-No ZIP path argument, verbose mode, custom host, custom port, or `--no-open` option is part of MVP.
+ZIP path arguments, verbose mode, custom host, custom port, and `--no-open` are not part of the current public CLI contract.
 
 ## 3. Platform and runtime
 
@@ -144,9 +144,9 @@ Use shadcn selectively. Keep generated primitives thin and compose application-s
 
 Use `@zip.js/zip.js` rather than JSZip.
 
-Reasons include metadata visibility, on-demand extraction, and keeping the runtime session capable of extracting only the SVG that is actually previewed/downloaded.
+The design depends on metadata visibility, on-demand extraction, and keeping the runtime session capable of extracting only the SVG that is actually previewed/downloaded.
 
-Implementation must verify the current zip.js API before relying on specific options such as CRC checking or strict parsing. Do not cargo-cult API names from this design document.
+Verify the current zip.js API before relying on specific security, CRC, or strict-parsing options. Do not cargo-cult API names from old documentation or this design record.
 
 ### 4.3 CLI implementation
 
@@ -165,7 +165,7 @@ Implementation must verify the current zip.js API before relying on specific opt
 - Playwright.
 - `@axe-core/playwright`.
 
-Strong TypeScript settings should include:
+Strong TypeScript settings include:
 
 - `strict`,
 - `noUncheckedIndexedAccess`,
@@ -179,7 +179,7 @@ Avoid `any`, unsafe double casts, and weakly typed boundary handling. Prefer typ
 
 ### 5.1 Layering
 
-The domain/core layer must be React-independent and contain pure or mostly pure logic for:
+The domain/core layer is React-independent and contains pure or mostly pure logic for:
 
 - package metadata parsing,
 - structural validation,
@@ -205,7 +205,7 @@ A runtime `IconPackageSession`-style object owns package-scoped resources such a
 
 This runtime object is not stored in Zustand.
 
-Zustand contains only shared serializable-ish app state that benefits from cross-component access, such as:
+Zustand contains only shared serializable-ish application state that benefits from cross-component access, such as:
 
 - current icon metadata list,
 - selected category,
@@ -213,9 +213,7 @@ Zustand contains only shared serializable-ish app state that benefits from cross
 - selected icon ID,
 - load status and public package summary.
 
-Derived search results are computed from state/session inputs and are not duplicated into the store.
-
-Ephemeral component UI state remains local React state when possible.
+Derived search results are computed from state/session inputs and are not duplicated into the store. Ephemeral component UI state remains local React state when possible.
 
 ### 5.3 Package replacement lifecycle
 
@@ -235,7 +233,7 @@ Ephemeral component UI state remains local React state when possible.
 
 The application does not hard-code a Microsoft ZIP version number such as `V24`.
 
-Compatibility is structural. The app is designed and tested against the latest official package available during release verification, but old or future packages may work if structurally compatible.
+Compatibility is structural. The app is designed and tested against the latest official package available during release verification, but older or future packages may work if structurally compatible.
 
 Only the latest package explicitly recorded as successfully verified in `COMPATIBILITY.md` is officially supported.
 
@@ -246,15 +244,15 @@ Only the latest package explicitly recorded as successfully verified in `COMPATI
 - Identify browsable SVG entries.
 - Ignore non-SVG files for browsing/search.
 - Use ZIP folder hierarchy as the authoritative category structure.
-- Do not invent/reclassify Microsoft service categories.
+- Do not invent or reclassify Microsoft service categories.
 - Hide one single common packaging root folder when all browsable icons share it.
 - Otherwise show roots as they exist.
 - Recursive folder hierarchy is supported.
 - Parent category selection includes all descendant icons.
 
-Implementation-time validation thresholds must be derived from the actual latest official ZIP with generous headroom, not from guessed category names or a hard-coded version filename.
+Validation thresholds are derived from the actual current official ZIP with generous headroom rather than guessed category names or a hard-coded version filename.
 
-Reasonable safety checks include rejecting ambiguous/unsafe paths, duplicate normalized paths, encrypted archives, and archive structures that are implausible for the supported official package. ZIP hardening should remain proportionate to the product's intended happy path; do not turn MVP into a hostile-archive research project.
+Safety checks include rejecting ambiguous/unsafe paths, duplicate normalized paths, encrypted archives, and archive structures that are implausible for the supported official package. ZIP hardening should remain proportionate to the product's intended happy path; this project is not a hostile-archive research platform.
 
 ### 6.3 Icon ID
 
@@ -283,7 +281,7 @@ Fallback for nonmatching SVG filenames:
 
 Original filenames are never changed for download.
 
-Naming-convention match rate may be used as one structural plausibility signal. The release verification process should measure the actual official package first and set thresholds with headroom.
+Naming-convention match rate may be used as one structural plausibility signal. Release verification measures the actual official package and keeps thresholds with headroom.
 
 ## 7. Search design
 
@@ -297,7 +295,7 @@ Default search scope is all categories. If a category is selected, search is res
 
 Search is real-time with approximately 150–200 ms debounce.
 
-Normalization should make inputs such as these behave similarly:
+Normalization makes inputs such as these behave similarly:
 
 - `app service`
 - `app-service`
@@ -310,21 +308,21 @@ Ranking priority:
 3. display-name substring match,
 4. Fuse fuzzy results.
 
-Initial Fuse weighting target:
+Fuse weighting target:
 
 - display name: 0.7,
 - filename: 0.2,
 - category path: 0.1.
 
-Initial fuzzy threshold target is around 0.35, but it must be tuned against real package data rather than treated as an immutable constant.
+The fuzzy threshold is around 0.35 and should continue to be tuned against real package data rather than treated as an immutable constant.
 
-Weak fuzzy matches should be omitted. Do not impose an arbitrary result-count cap in MVP. Show the result count.
+Weak fuzzy matches are omitted. Do not impose an arbitrary result-count cap. Show the result count.
 
 ## 8. User experience
 
 ### 8.1 Visual direction
 
-The interface should be modern, calm, dense, and product-focused rather than a generic admin dashboard.
+The interface is modern, calm, dense, and product-focused rather than a generic admin dashboard.
 
 Primary palette direction:
 
@@ -333,9 +331,9 @@ Primary palette direction:
 - vivid blue accent approximately inspired by `#3880F1`,
 - deep neutral gray surfaces in dark mode rather than pure black.
 
-Do not use one raw blue everywhere. Define semantic design tokens such as accent, hover, soft accent, focus ring, borders, foreground, muted foreground, and surfaces.
+Use semantic design tokens such as accent, hover, soft accent, focus ring, borders, foreground, muted foreground, and surfaces rather than one raw blue everywhere.
 
-Dark mode follows `prefers-color-scheme`. MVP has no manual theme switch.
+Dark mode follows `prefers-color-scheme`. There is no manual theme switch in the current baseline.
 
 Avoid:
 
@@ -359,7 +357,7 @@ Do not copy brand-specific compositions or create a false impression of affiliat
 
 ### 8.3 Branding
 
-The app logo/favicon must be independent and abstract. Planned direction is a compact rounded tile/grid motif using neutral surfaces and the project's blue accent.
+The app logo/favicon must be independent and abstract. The branding direction is a compact rounded tile/grid motif using neutral surfaces and the project's blue accent.
 
 Do not use Microsoft, Azure, Windows, or official product iconography as the app logo/favicon.
 
@@ -367,7 +365,7 @@ Do not use Microsoft, Azure, Windows, or official product iconography as the app
 
 Use a locally bundled Geist Sans Variable font. No runtime font CDN/network request.
 
-Geist Mono is not required for MVP.
+Geist Mono is not required by the current baseline.
 
 Retain the font's upstream license and notice information in project notices. Do not treat the font as project-owned artwork.
 
@@ -429,7 +427,7 @@ The main icon grid remains flat; it is not grouped by category.
 - No inline download control on the card.
 - Preview images lazy-load.
 - Use stable fixed-size skeletons while previews load.
-- No list virtualization for MVP.
+- No list virtualization in the current baseline.
 
 Duplicate display names are disambiguated using category path.
 
@@ -479,7 +477,7 @@ Do not claim this lightweight check is a general-purpose SVG sanitizer.
 
 ### 9.3 CSP and browser security headers
 
-The local server must set a restrictive CSP. Target policy shape:
+The local server sets a restrictive CSP with the following policy shape:
 
 ```text
 default-src 'self';
@@ -492,7 +490,7 @@ base-uri 'none';
 frame-ancestors 'none';
 ```
 
-Only add allowances actually required by the built app. Do not use `unsafe-eval`. Determine whether Tailwind/shadcn output needs an inline-style allowance based on the production build rather than assumption.
+Only allowances required by the built app are acceptable. Do not use `unsafe-eval`.
 
 Also set appropriate headers such as:
 
@@ -526,7 +524,7 @@ Use a React Error Boundary for unexpected render/application failures. On fatal 
 
 ## 10. Accessibility
 
-MVP accessibility requirements include:
+Current accessibility requirements include:
 
 - keyboard operation for primary flows,
 - visible focus rings,
@@ -543,7 +541,7 @@ Use `@axe-core/playwright` on key screens. Automated axe checks do not constitut
 
 ## 11. Testing strategy
 
-### 11.1 Unit tests
+### 11.1 Unit and component tests
 
 Core/domain logic receives the deepest unit coverage, including:
 
@@ -554,10 +552,10 @@ Core/domain logic receives the deepest unit coverage, including:
 - recursive category hierarchy,
 - search normalization and ranking,
 - invalid package behavior,
-- session replacement/reset behavior where testable,
+- session replacement/reset behavior,
 - original filename preservation.
 
-Initial core coverage gates:
+Core coverage gates:
 
 - Lines: 90%
 - Functions: 90%
@@ -566,35 +564,31 @@ Initial core coverage gates:
 
 Do not game the metrics with meaningless tests.
 
-### 11.2 Component tests
-
 Use React Testing Library for important interaction boundaries rather than exhaustive visual testing of every primitive.
 
-### 11.3 E2E
+### 11.2 Browser E2E, accessibility, and visual regression
 
-Playwright should cover one or two golden paths, including:
+Playwright covers the golden path using only project-owned dummy ZIP/SVG fixtures:
 
 1. start the local app,
-2. upload a self-created dummy ZIP,
-3. browse icons,
+2. upload a dummy ZIP,
+3. browse icons/categories,
 4. search,
-5. open details Dialog,
-6. download an SVG,
+5. open the details Dialog,
+6. download an SVG and verify the downloaded bytes,
 7. verify key keyboard/focus behavior.
 
-Microsoft ZIP/SVG assets must never be committed as test fixtures. Tests create/use project-owned dummy SVG/ZIP data.
+Automated axe checks cover key screens.
 
-### 11.4 Visual regression
-
-Keep visual regression limited and stable, initially covering approximately:
+Visual regression is intentionally limited to stable Linux baselines such as:
 
 - initial package screen,
 - loaded icon grid,
 - details dialog.
 
-Use a stable Linux CI environment and local font resources for deterministic screenshots.
+Microsoft ZIP/SVG assets must never be committed as test fixtures.
 
-### 11.5 CI matrix
+### 11.3 CI matrix
 
 Linux runs the full suite:
 
@@ -604,11 +598,10 @@ Linux runs the full suite:
 - build,
 - Playwright,
 - accessibility smoke checks,
-- npm package-content validation.
+- npm package-content validation,
+- release-readiness validation where relevant.
 
-Windows and macOS run lighter CLI smoke validation.
-
-CodeQL for JavaScript/TypeScript is enabled from MVP.
+Windows and macOS run packaged CLI smoke validation. CodeQL for JavaScript/TypeScript is enabled.
 
 ## 12. Dependency and package policy
 
@@ -620,87 +613,30 @@ CodeQL for JavaScript/TypeScript is enabled from MVP.
 - Release validation runs `npm audit` and blocks High/Critical findings.
 - `npm audit` is not required on every normal PR.
 
-The npm package uses an explicit `files` allowlist. Release CI runs `npm pack --dry-run` and verifies that no Microsoft ZIP/SVG, test fixture, accidental local package, or unrelated source artifact is published.
+The npm package uses an explicit `files` allowlist. Release CI validates package contents so Microsoft ZIP/SVG assets, test fixtures, accidental local packages, and unrelated source artifacts cannot be published.
 
-## 13. Repository governance
+## 13. Release and compatibility operations
 
-### 13.1 Canonical documents
+### 13.1 Release model
 
-- `DESIGN.md`: current design source of truth.
-- `AGENTS.md`: coding-agent instructions and document index.
-- `README.md`: public introduction and usage.
-- `COMPATIBILITY.md`: last manually verified official Microsoft package metadata.
-- `CONTRIBUTING.md`: external contribution rules.
-- `SECURITY.md`: vulnerability reporting/support policy.
-- `THIRD_PARTY_NOTICES.md`: third-party notices.
-- `LICENSE`: MIT license for project code.
+Use Changesets for release intent, versioning, CHANGELOG updates, and Release PR creation.
 
-ADR files are intentionally not used for MVP. Decision history lives in Issues, PRs, and Git history while `DESIGN.md` represents the current contract.
+Normal workflow:
 
-### 13.2 External contributions
+1. Feature/fix PR includes an appropriate Changeset when user-visible or release-relevant.
+2. Changesets Action creates/updates a Release PR.
+3. Human merges the Release PR.
+4. GitHub Actions publishes npm through Trusted Publishing/OIDC, verifies registry metadata and tarball availability, creates immutable `vX.Y.Z`, and creates the matching GitHub Release.
 
-External Issues and PRs are welcome.
+Version must match across `package.json`, npm, tag, and GitHub Release. Do not use moving major/minor tags.
 
-Small fixes may be proposed directly. Significant features, architecture changes, security model changes, UX policy changes, new distribution channels, or new foundational dependencies must be discussed in an Issue first.
+The default npm distribution channel is `latest`. Do not introduce `next`/`beta` channels until there is a real need.
 
-### 13.3 Agent behavior
+Normal publication must not rely on a long-lived `NPM_TOKEN`.
 
-Coding agents implement approved design; they do not invent replacement product policy.
+See `docs/RELEASE.md` for the operational runbook and the historical first-release bootstrap record.
 
-If an agent identifies a design/implementation conflict, it must explain the conflict and recommendation rather than silently changing:
-
-- architecture,
-- security model,
-- UX contract,
-- publication model,
-- runtime network policy,
-- foundational stack/dependencies.
-
-Implementation-level details not covered here may be decided pragmatically.
-
-## 14. Git and PR workflow
-
-Use GitHub Flow:
-
-- `main` is the only long-lived branch.
-- Work happens on short-lived branches.
-- Changes enter `main` through PRs.
-- Required CI must pass.
-- Direct pushes/force pushes to `main` should be prevented once repository rules are configured.
-- Solo project requires zero human approval count, but CI remains required.
-- Squash merge only.
-- Delete merged branches automatically.
-- PR titles use Conventional Commits.
-- Internal branch commit messages do not need to follow Conventional Commits.
-
-A PR template should include:
-
-- summary,
-- design impact,
-- validation performed,
-- Changeset status,
-- security/runtime-network confirmation,
-- confirmation that no Microsoft assets were added.
-
-## 15. Implementation plan for v0.1.0
-
-Implement in several PRs rather than one giant change.
-
-Recommended phases:
-
-1. Project foundation — Vite/React/TypeScript/Tailwind/shadcn, tooling, CI skeleton, repository docs.
-2. Core package processing — ZIP/session/parser/validator/category/search plus core tests.
-3. Application UI — package loading, sidebar/search/grid/dialog, responsive behavior, accessibility basics.
-4. CLI/local server — static server, browser launch, security headers, host/path handling.
-5. Release readiness — E2E, visual/a11y checks, npm packaging, compatibility verification command, watcher/release workflows.
-
-Create corresponding GitHub Issues and track them under a `v0.1.0` milestone when available.
-
-## 16. Release and versioning
-
-Initial release: `v0.1.0`.
-
-### 16.1 SemVer policy
+### 13.2 SemVer policy
 
 Before `1.0.0`:
 
@@ -715,57 +651,30 @@ At/after `1.0.0`, use normal SemVer:
 - minor: backward-compatible features,
 - major: breaking changes.
 
-### 16.2 npm channel
+### 13.3 Official package verification
 
-MVP publishes only the `latest` dist-tag. Do not introduce `next`/`beta` channels until there is a real need.
-
-### 16.3 Changesets release model
-
-Use Changesets for release intent, versioning, CHANGELOG, and Release PR creation.
-
-Target workflow:
-
-1. Feature/fix PR includes an appropriate Changeset when user-visible/release-relevant.
-2. Changesets Action creates/updates a Release PR.
-3. Human merges the Release PR.
-4. GitHub Actions publishes npm, creates immutable `vX.Y.Z` tag, and creates the GitHub Release.
-
-Version must match across `package.json`, npm, tag, and GitHub Release.
-
-Do not use moving major/minor tags.
-
-### 16.4 npm authentication
-
-Use npm Trusted Publishing/OIDC from GitHub Actions with provenance when supported. Do not rely on a long-lived `NPM_TOKEN` for normal publication.
-
-Initial package bootstrap may require a one-time manual npm step before trusted publisher configuration can be completed.
-
-## 17. Official package compatibility operations
-
-### 17.1 Release verification
-
-Provide a development-only command conceptually like:
+The development-only command:
 
 ```bash
 npm run verify:official -- /path/to/latest-official.zip
 ```
 
-It reuses production core parser/validator code and prints compatibility metadata suitable for updating `COMPATIBILITY.md`.
+reuses production parser/validator code and prints compatibility metadata suitable for updating `COMPATIBILITY.md`.
 
 This command is not part of the public end-user CLI.
 
-Before release, manually download the latest official package from Microsoft, run this check locally, and update `COMPATIBILITY.md`.
+Before a release that claims compatibility with a newer official package, manually download the current package from Microsoft, run this verification locally, and update `COMPATIBILITY.md` only after a successful result.
 
 Only the most recently recorded successful package is formally supported.
 
-### 17.2 Weekly Microsoft watcher
+### 13.4 Weekly Microsoft watcher
 
 A scheduled GitHub Actions workflow checks the official Microsoft Azure Architecture Icons page approximately weekly for:
 
 1. a changed/new official ZIP link/package identity,
 2. meaningful changes to the icon terms/guidelines text.
 
-If a change is detected, create a maintenance Issue for human review.
+A difference creates or updates a maintenance Issue for human review.
 
 The watcher:
 
@@ -775,20 +684,96 @@ The watcher:
 - does not automatically change application code,
 - does not introduce a runtime network dependency into the application.
 
-If Microsoft terms appear materially incompatible with the project's intended use, pause new releases and review the project's public documentation and distribution status. Do not implement a remote kill switch.
+If Microsoft terms appear materially incompatible with the project's intended use, pause new releases and review public documentation and distribution status. Do not implement a remote kill switch.
 
-## 18. Cache behavior
+## 14. Repository governance
+
+### 14.1 Canonical documents
+
+- `DESIGN.md`: current design source of truth.
+- `AGENTS.md`: coding-agent instructions and document index.
+- `README.md`: public introduction, usage, and release status.
+- `COMPATIBILITY.md`: last manually verified official Microsoft package metadata.
+- `CONTRIBUTING.md`: external contribution rules.
+- `SECURITY.md`: vulnerability reporting/support policy.
+- `THIRD_PARTY_NOTICES.md`: third-party notices.
+- `docs/RELEASE.md`: release and compatibility operations.
+- `LICENSE`: MIT license for project code.
+
+The repository intentionally does not maintain a separate ADR set. Decision history lives in Issues, PRs, and Git history while `DESIGN.md` represents the current contract.
+
+### 14.2 External contributions
+
+External Issues and PRs are welcome.
+
+Small fixes may be proposed directly. Significant features, architecture changes, security model changes, UX policy changes, new distribution channels, or new foundational dependencies must be discussed in an Issue first.
+
+### 14.3 Agent behavior
+
+Coding agents implement approved design; they do not invent replacement product policy.
+
+If an agent identifies a design/implementation conflict, it must explain the conflict and recommendation rather than silently changing:
+
+- architecture,
+- security model,
+- UX contract,
+- publication model,
+- runtime network policy,
+- foundational stack/dependencies.
+
+Implementation-level details not covered here may be decided pragmatically.
+
+### 14.4 Git and PR workflow
+
+Use GitHub Flow:
+
+- `main` is the only long-lived branch.
+- Work happens on short-lived branches.
+- Changes enter `main` through PRs.
+- Required CI must pass.
+- Squash merge only.
+- Delete merged branches automatically.
+- PR titles use Conventional Commits.
+- Internal branch commit messages do not need to follow Conventional Commits.
+
+A PR should state:
+
+- summary,
+- design impact,
+- validation performed,
+- Changeset status,
+- security/runtime-network confirmation,
+- confirmation that no Microsoft assets were added.
+
+## 15. Cache and version behavior
+
+### 15.1 Local cache policy
 
 - `index.html`: no-store.
 - hashed Vite static assets: long-lived immutable caching is acceptable.
 
 This local cache policy must not introduce persistence of user-selected Microsoft assets.
 
-## 19. Version display
+### 15.2 Version display
 
-CLI version and Web UI version must derive from the same `package.json` version source rather than independent constants.
+CLI version and Web UI version derive from the same `package.json` version source rather than independent constants.
 
-## 20. Design-change rule
+## 16. v0.1.0 implementation record
+
+`v0.1.0` is complete and publicly released. The original MVP implementation plan is retained here only as a historical record of how the baseline was delivered.
+
+Completed phases:
+
+1. **Project foundation** — Vite/React/TypeScript/Tailwind/shadcn, tooling, CI skeleton, and repository documents.
+2. **Core package processing** — ZIP/session/parser/validator/category/search plus core tests.
+3. **Application UI** — package loading/replacement, category navigation, search, icon grid, details dialog, responsive behavior, and accessibility basics.
+4. **CLI/local server** — static server, browser launch, security headers, Host/path handling, loopback-only binding, and shutdown behavior.
+5. **Release readiness** — browser E2E, visual/a11y checks, package-content validation, official-package compatibility verification, weekly Microsoft watcher, Changesets, npm Trusted Publishing/OIDC, immutable version tags, and GitHub Releases.
+6. **First public publication** — `@shimabell06/cloud-arch-icon-browser@0.1.0` published with GitHub Actions provenance and matching `v0.1.0` GitHub Release.
+
+Future work should be tracked as new Issues/design decisions rather than appended to this historical implementation plan.
+
+## 17. Design-change rule
 
 Changes to any of the following require explicit approval and an update to this document in the same or preceding PR:
 
