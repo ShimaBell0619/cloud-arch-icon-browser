@@ -102,7 +102,7 @@ try {
   const installResult = runNpm(
     [
       "install",
-      "--offline",
+      "--prefer-offline",
       "--ignore-scripts",
       "--no-audit",
       "--no-fund",
