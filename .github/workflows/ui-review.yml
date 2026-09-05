@@ -1,0 +1,105 @@
+name: UI Review
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.*"
+      - ".node-version"
+      - ".github/workflows/ui-review.yml"
+      - "scripts/ui-review/**"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit SHA to review
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-review-${{ github.event.pull_request.number || inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Capture UI review baseline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout review target
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Detect browser UI
+        id: browser-ui
+        shell: bash
+        run: |
+          if [[ -f src/components/icon-details-dialog.tsx ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Browser UI not available yet
+        if: steps.browser-ui.outputs.available != 'true'
+        run: echo "Browser UI is not present on this ref; visual capture is skipped."
+
+      - name: Set up Node
+        if: steps.browser-ui.outputs.available == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install app dependencies
+        if: steps.browser-ui.outputs.available == 'true'
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        if: steps.browser-ui.outputs.available == 'true'
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Create project-owned review fixture
+        if: steps.browser-ui.outputs.available == 'true'
+        run: python3 scripts/ui-review/create_fixture.py /tmp/ui-review-fixture.zip
+
+      - name: Start local development server
+        if: steps.browser-ui.outputs.available == 'true'
+        shell: bash
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/ui-review-vite.log 2>&1 &
+          echo $! > /tmp/ui-review-vite.pid
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:5173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/ui-review-vite.log
+          exit 1
+
+      - name: Capture visual baseline
+        if: steps.browser-ui.outputs.available == 'true'
+        env:
+          UI_REVIEW_BASE_URL: http://127.0.0.1:5173/
+          UI_REVIEW_FIXTURE: /tmp/ui-review-fixture.zip
+          UI_REVIEW_OUTPUT: /tmp/ui-review-captures
+        run: node scripts/ui-review/capture.mjs
+
+      - name: Upload UI review screenshots
+        if: steps.browser-ui.outputs.available == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-review-${{ github.event.pull_request.number || github.run_id }}
+          path: /tmp/ui-review-captures/*.png
+          if-no-files-found: error
+          retention-days: 14

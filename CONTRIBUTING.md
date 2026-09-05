@@ -9,6 +9,7 @@ Read:
 - `DESIGN.md`
 - `AGENTS.md` if using a coding agent
 - `SECURITY.md` for security-sensitive changes
+- `docs/UI_REVIEW.md` for browser UI or visual-review changes
 
 ## Issue-first changes
 
@@ -85,9 +86,24 @@ are written to the ignored `coverage/` directory. Core fixtures are generated in
 memory from project-owned shapes; do not replace them with Microsoft assets. See
 the [core integration notes](./docs/icon-package-core.md).
 
-Playwright, accessibility/visual checks,
-cross-platform CLI smoke checks, package validation, and Changesets/release
-automation follow in the later implementation issues.
+## UI visual review
+
+Browser UI changes use the repository-standard workflow described in
+[`docs/UI_REVIEW.md`](./docs/UI_REVIEW.md).
+
+For UI-affecting pull requests, the `UI Review` GitHub Actions workflow runs a real
+Chromium browser with a project-owned dummy icon ZIP and uploads a stable six-image
+baseline as an Actions artifact. Review the screenshots themselves before merging;
+source review and jsdom tests are not substitutes for visual QA.
+
+When an interactive cross-device check is useful, run `Publish Pages Preview`
+manually and explicitly choose the branch, tag, or commit SHA to publish. GitHub
+Pages is development-only preview infrastructure. It is not a supported hosted
+product mode or release/distribution channel, and pull requests do not
+automatically overwrite the shared Pages preview.
+
+Playwright installation for UI review is workflow-only and must not cause
+Microsoft assets to be stored, uploaded, or published.
 
 ## Pull requests
 
@@ -109,6 +125,9 @@ A PR should explain:
 - Changeset status once Changesets is configured,
 - whether security/runtime-network behavior changed,
 - confirmation that no Microsoft assets were added.
+
+For browser UI changes, also inspect the `UI Review` artifact and mention any
+intentional visual-baseline change in the PR description.
 
 The project uses squash merge.
 
