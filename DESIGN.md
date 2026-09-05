@@ -18,12 +18,13 @@ The project is independent and must not imply Microsoft affiliation, endorsement
 
 - The tool does not include Microsoft Azure Architecture Icons.
 - The user downloads the official ZIP from Microsoft.
-- The user selects that ZIP in the local browser UI.
-- Processing stays local to the user's machine.
+- The user selects that ZIP in the browser UI.
+- Processing stays local to the user's machine/browser session.
 - The tool does not modify Microsoft SVG assets.
 - A downloaded SVG is the original file from the selected ZIP, with the original filename unchanged.
-- The application makes no automatic external network requests at runtime.
+- The application makes no automatic external API/network requests for package content, telemetry, analytics, or update metadata at runtime.
 - Manual links opened by the user, such as Microsoft Learn links, are allowed.
+- An optional GitHub Pages build may host the static application solely as a UI-verification preview; it must not upload, persist, or proxy user-selected ZIP/SVG contents and is not the supported product distribution channel.
 
 ### 1.2 Official Microsoft terms
 
@@ -31,7 +32,7 @@ The authoritative terms are the current terms published by Microsoft on the Azur
 
 https://learn.microsoft.com/en-us/azure/architecture/icons/
 
-The project must not copy Microsoft assets into the repository, npm package, screenshots used as fixtures, release artifacts, or tests.
+The project must not copy Microsoft assets into the repository, npm package, screenshots used as fixtures, release artifacts, tests, or GitHub Pages artifacts.
 
 Microsoft's published guidance includes restrictions against cropping, flipping, rotating, distorting, or changing icon shape. The application therefore treats SVG files as immutable source assets.
 
@@ -39,7 +40,7 @@ Microsoft's published guidance includes restrictions against cropping, flipping,
 
 The following are outside the current product baseline and require an explicit design decision before implementation:
 
-- Hosted/public web application.
+- Hosted/public web application as a supported product distribution or service. The narrow GitHub Pages UI-preview exception is defined in §2.3.
 - Automatic download of the Microsoft icon package.
 - Automatic runtime check for the latest Microsoft package.
 - Account system, backend database, cloud storage, or telemetry.
@@ -79,7 +80,24 @@ npx @shimabell06/cloud-arch-icon-browser
 
 The npm package contains both the CLI and the prebuilt Web UI.
 
-### 2.3 Local server
+### 2.3 GitHub Pages UI preview
+
+GitHub Pages may host the built Web UI as an optional maintainer preview for checking responsive behavior from phones, tablets, and other browsers without starting the local CLI server.
+
+This preview is not a supported distribution channel and must preserve the same local package-processing boundary:
+
+- Deploy only repository-owned built application assets.
+- Never include Microsoft ZIP/SVG assets in the repository or Pages artifact.
+- A ZIP selected on the Pages site is processed entirely in that browser session.
+- Do not upload selected ZIP/SVG content to GitHub or another backend.
+- Do not add telemetry, analytics, account state, cloud sync, or runtime package/update APIs.
+- Do not persist file handles or silently reopen a package.
+- The Pages build may use the repository subpath base required by GitHub Pages while the normal npm/npx build keeps the root `/` base.
+- Pull requests should validate the Pages-specific Vite build; deployment occurs only from `main` or an explicit maintainer workflow dispatch.
+
+The operational setup is documented in `docs/PAGES_PREVIEW.md`.
+
+### 2.4 Local server
 
 The CLI:
 
@@ -98,7 +116,7 @@ The server is static-only:
 - Path traversal is rejected.
 - Host header validation permits only the expected localhost/127.0.0.1 host and selected port.
 
-### 2.4 CLI surface
+### 2.5 CLI surface
 
 The current CLI supports:
 
@@ -117,7 +135,7 @@ ZIP path arguments, verbose mode, custom host, custom port, and `--no-open` are 
 - Development and CI use Node 24.20.0 via `.node-version`.
 - `package.json` runtime engine must match the supported range above.
 - Supported operating systems: Windows, macOS, Linux.
-- Package is ESM-only (`"type": "module"`).
+- Package is ESM-only (`"type": "module").
 - Package manager: npm.
 - `package-lock.json` is committed.
 - CI and release use `npm ci`.
@@ -567,14 +585,16 @@ Avoid unnecessary cross-origin isolation policies if they interfere with normal 
 
 ### 9.4 Runtime network policy
 
-The application performs no automatic external network communication after npm package retrieval.
+The application has no backend/runtime API dependency for icon-package processing. After the static application assets are loaded, it performs no automatic external network communication for package content, telemetry, analytics, crash reporting, or update metadata.
+
+The GitHub Pages preview necessarily downloads the repository-owned static application assets from GitHub Pages. That hosting transport is not an application backend and does not change the local ZIP-processing boundary.
 
 Therefore:
 
 - no telemetry,
 - no analytics,
 - no crash reporting,
-- no CDN dependencies,
+- no CDN runtime dependencies beyond the selected static host serving the built app,
 - no Google Fonts,
 - no runtime update check,
 - no automatic Microsoft package/version lookup.
@@ -669,6 +689,8 @@ Linux runs the full suite:
 
 Windows and macOS run packaged CLI smoke validation. CodeQL for JavaScript/TypeScript is enabled.
 
+The Pages preview workflow also validates a Vite build using the repository Pages base path on pull requests. Pages deployment is restricted to `main` or an explicit maintainer workflow dispatch.
+
 ## 12. Dependency and package policy
 
 - Pin direct dependencies/devDependencies to exact versions.
@@ -699,6 +721,8 @@ Version must match across `package.json`, npm, tag, and GitHub Release. Do not u
 The default npm distribution channel is `latest`. Do not introduce `next`/`beta` channels until there is a real need.
 
 Normal publication must not rely on a long-lived `NPM_TOKEN`.
+
+The GitHub Pages UI preview is operationally separate from npm release publication and does not define or change the product version.
 
 See `docs/RELEASE.md` for the operational runbook and the historical first-release bootstrap record.
 
@@ -764,6 +788,7 @@ If Microsoft terms appear materially incompatible with the project's intended us
 - `SECURITY.md`: vulnerability reporting/support policy.
 - `THIRD_PARTY_NOTICES.md`: third-party notices.
 - `docs/RELEASE.md`: release and compatibility operations.
+- `docs/PAGES_PREVIEW.md`: GitHub Pages UI-preview setup and operational boundary.
 - `LICENSE`: MIT license for project code.
 
 The repository intentionally does not maintain a separate ADR set. Decision history lives in Issues, PRs, and Git history while `DESIGN.md` represents the current contract.
@@ -818,7 +843,7 @@ A PR should state:
 - `index.html`: no-store.
 - hashed Vite static assets: long-lived immutable caching is acceptable.
 
-This local cache policy must not introduce persistence of user-selected Microsoft assets.
+This local cache policy must not introduce persistence of user-selected Microsoft assets. The Pages preview may use GitHub Pages' hosting/cache behavior for the repository-owned static build, but it must not cache or persist user-selected ZIP/package data on the server.
 
 ### 15.2 Version display
 
