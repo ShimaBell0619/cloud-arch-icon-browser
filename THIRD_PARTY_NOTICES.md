@@ -29,6 +29,19 @@ Copyright (c) 2023 shadcn. The upstream MIT license is retained in
 [`public/licenses/shadcn-MIT.txt`](./public/licenses/shadcn-MIT.txt) and copied
 into `dist/licenses/` by Vite.
 
+## ZIP processing and search
+
+`@zip.js/zip.js` 2.11.1 is distributed under BSD-3-Clause. Its unmodified license
+is retained in [`public/licenses/zip.js-BSD-3-Clause.txt`](./public/licenses/zip.js-BSD-3-Clause.txt).
+The core uses the package's native entry point with its bundled JavaScript
+compression fallback; no remote worker or WASM resource is fetched.
+
+Fuse.js 7.5.0 is copyright (c) 2026 Kiro Risk and distributed under Apache-2.0.
+Its unmodified license is retained in
+[`public/licenses/Fuse-Apache-2.0.txt`](./public/licenses/Fuse-Apache-2.0.txt).
+Vite copies both license files into `dist/licenses/`; refresh them from the
+installed packages when updating these dependencies.
+
 ## Runtime and development dependencies
 
 Planned major open-source dependencies/tooling include, subject to implementation-time version selection and license verification:
