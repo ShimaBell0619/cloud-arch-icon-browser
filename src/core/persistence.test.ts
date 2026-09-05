@@ -3,18 +3,18 @@ import {
   addFavorite,
   createDefaultPersistedState,
   loadPersistedState,
-  parsePersistedState,
   PERSISTENCE_KEY,
   PERSISTENCE_SCHEMA_VERSION,
+  parsePersistedState,
   RECENT_ICON_LIMIT,
   RECENT_SEARCH_LIMIT,
   reconcilePersistedStateWithIcons,
   recordRecentIcon,
   recordRecentSearch,
   removeFavorite,
+  type StorageLike,
   savePersistedState,
   setPersistedPreferences,
-  type StorageLike,
 } from "./persistence";
 import type { IconEntry } from "./types";
 
@@ -50,7 +50,7 @@ describe("persistence", () => {
     const defaults = createDefaultPersistedState();
 
     expect(parsePersistedState(null)).toEqual(defaults);
-    expect(parsePersistedState("{"))).toEqual(defaults);
+    expect(parsePersistedState("{")).toEqual(defaults);
     expect(parsePersistedState(JSON.stringify({ schemaVersion: 0 }))).toEqual(
       defaults,
     );
