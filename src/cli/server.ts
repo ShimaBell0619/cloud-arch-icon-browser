@@ -1,5 +1,9 @@
 import { readFile, realpath, stat } from "node:fs/promises";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import { extname, resolve, sep } from "node:path";
 
 const LOOPBACK_HOST = "127.0.0.1";
@@ -11,7 +15,6 @@ const CONTENT_SECURITY_POLICY = [
   "img-src 'self' blob: data:",
   "font-src 'self'",
   "connect-src 'self'",
-  "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
