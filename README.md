@@ -35,10 +35,15 @@ The app may provide manual links to Microsoft documentation, but it does not aut
 
 ## Project status
 
-The project foundation is available as a minimal local development shell. ZIP
-loading, browsing/search, the production CLI, and release automation are not yet
-implemented. The npm package remains private until publication setup resolves
-the scope and packaging requirements.
+The project includes a minimal local development shell and a React-independent
+core for ZIP validation, metadata/categories, search, and lazy SVG package
+sessions. The shell does not yet expose these operations; the browser UI,
+production CLI, and release automation are still pending. The npm package remains
+private until publication setup resolves the scope and packaging requirements.
+
+See the [core integration notes](./docs/icon-package-core.md) for its API and
+validation boundaries. Official-package verification remains pending as recorded
+in [`COMPATIBILITY.md`](./COMPATIBILITY.md).
 
 ## Development
 

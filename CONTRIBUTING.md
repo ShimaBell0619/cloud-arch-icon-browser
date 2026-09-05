@@ -67,7 +67,13 @@ upstream notices. Theme tokens and system-driven dark mode live in `src/index.cs
 
 Vitest uses jsdom, React Testing Library, and the cleanup setup in `src/test`.
 Foundation CI runs the commands above on Linux; CodeQL scans JavaScript/TypeScript.
-Core coverage gates belong to Issue #2. Playwright, accessibility/visual checks,
+`npm test` also measures every production module in `src/core` and enforces
+90% lines/functions/statements and 85% branches. Reports are written to the ignored
+`coverage/` directory. Core fixtures are generated in memory from project-owned
+shapes; do not replace them with Microsoft assets. See the
+[core integration notes](./docs/icon-package-core.md).
+
+Playwright, accessibility/visual checks,
 cross-platform CLI smoke checks, package validation, and Changesets/release
 automation follow in the later implementation issues.
 
