@@ -30,6 +30,7 @@ import {
   IconPackageSession,
   type PackageProblem,
 } from "@/core";
+import { choosePackageFile } from "@/lib/package-file-picker";
 import { version } from "../package.json";
 
 const PACKAGE_ACCEPT = ".zip,application/zip,application/x-zip-compressed";
@@ -155,7 +156,11 @@ function PackagePicker({ loadPhase, loadError, onLoad }: PackagePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  const chooseFile = () => inputRef.current?.click();
+  const chooseFile = () => {
+    void choosePackageFile({ fallbackInput: inputRef.current }).then((file) => {
+      if (file) onLoad(file);
+    });
+  };
 
   const handleInput = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
@@ -389,6 +394,15 @@ function LoadedWorkspace({
     onReplace(file);
   };
 
+  const chooseReplacement = () => {
+    setDropNotice(null);
+    void choosePackageFile({ fallbackInput: replacementInputRef.current }).then(
+      (file) => {
+        if (file) onReplace(file);
+      },
+    );
+  };
+
   const selectCategory = (categoryId: string | null) => {
     setSelectedCategory(categoryId);
   };
@@ -502,10 +516,7 @@ function LoadedWorkspace({
               variant="outline"
               disabled={loadPhase !== null}
               aria-label="Change package"
-              onClick={() => {
-                setDropNotice(null);
-                replacementInputRef.current?.click();
-              }}
+              onClick={chooseReplacement}
             >
               {loadPhase ? (
                 <LoaderCircleIcon
