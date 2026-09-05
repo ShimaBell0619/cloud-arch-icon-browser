@@ -134,7 +134,7 @@ ZIP path arguments, verbose mode, custom host, custom port, and `--no-open` are 
 - Base UI-backed shadcn primitives
 - Rhea-style shadcn visual direction
 - Lucide icons
-- Zustand for shared application state
+- React local state by default; introduce a shared state library only when cross-component state warrants it
 - Fuse.js for fuzzy search
 - Sonner for lightweight notifications
 
@@ -187,6 +187,8 @@ The domain/core layer is React-independent and contains pure or mostly pure logi
 - display-name extraction,
 - category tree construction,
 - search normalization/ranking,
+- stable persisted icon identity and re-matching,
+- local UI persistence parsing/migration helpers,
 - domain types.
 
 No React imports are allowed in core domain modules.
@@ -203,9 +205,9 @@ A runtime `IconPackageSession`-style object owns package-scoped resources such a
 - object URL cache,
 - cleanup/disposal.
 
-This runtime object is not stored in Zustand.
+This runtime object must not be placed in local persistence or in any serializable/shared state container.
 
-Zustand contains only shared serializable-ish application state that benefits from cross-component access, such as:
+The current UI may use local React state. If a shared state library is introduced later, it may hold only serializable-ish application metadata that benefits from cross-component access, such as:
 
 - current icon metadata list,
 - selected category,
@@ -213,12 +215,69 @@ Zustand contains only shared serializable-ish application state that benefits fr
 - selected icon ID,
 - load status and public package summary.
 
-Derived search results are computed from state/session inputs and are not duplicated into the store. Ephemeral component UI state remains local React state when possible.
+A shared store must never own the ZIP reader, `IconPackageSession`, Blob/Object URLs, extracted SVG bodies, or other package-scoped resources.
 
-### 5.3 Package replacement lifecycle
+Derived search results are computed from state/session inputs and are not duplicated into shared state. Ephemeral component UI state remains local React state when possible.
+
+### 5.3 Local UI persistence
+
+UI persistence is intentionally separate from package persistence. The application may remember approved UI metadata across reloads while the Microsoft icon package itself always remains session-only.
+
+The local persistence root key is:
+
+```text
+cloud-arch-icon-browser:state
+```
+
+Persistence requirements:
+
+- The root object is explicitly schema-versioned.
+- `localStorage` is treated as untrusted input and parsed defensively.
+- Malformed JSON, invalid field types, or an unknown future schema version fall back to clean defaults rather than preventing application startup.
+- Known historical schema versions must be migrated explicitly when such versions exist; do not guess migrations for unknown future versions.
+- Storage read/write failures must not prevent the package picker or active package workflow from functioning.
+- Persistence parsing, migration, matching, and history logic remain React- and state-library-independent.
+
+Approved persisted data includes only UI metadata:
+
+- theme preference: `system | light | dark`,
+- view preference: `grid | compact`,
+- sidebar collapsed state,
+- Favorite icon references,
+- recently opened icon references,
+- recent search query strings.
+
+Never persist:
+
+- ZIP bytes or a selected file handle,
+- SVG bodies/bytes,
+- generated image bytes,
+- Blob/Object URLs,
+- zip readers,
+- `IconPackageSession`,
+- other package-scoped runtime resources.
+
+Favorite and Recent icon records store only the minimum real metadata needed for deterministic re-matching: canonical visible path, original filename, display name, category path, and a saved/opened timestamp. Stored metadata is not authoritative display data; after a package is selected, the UI renders the currently matched `IconEntry` metadata.
+
+Favorite/Recent records are not partitioned by Microsoft package version. Re-matching follows a conservative two-stage policy:
+
+1. Exact match on the canonical visible relative path derived from `categoryPath + originalFilename`, excluding the hidden packaging root.
+2. If exact matching fails, compare a canonical service filename/name that ignores only known mechanical naming differences such as the numeric `NNNNN-icon-service-` prefix. This fallback is accepted only when exactly one current icon matches.
+
+Fuzzy-search similarity must never migrate a Favorite/Recent record. Ambiguous or missing records remain persisted but are hidden for the active package. A successful unique fallback match self-heals the persisted reference to the current icon metadata for later exact matching.
+
+History behavior:
+
+- Recent icons: maximum 50, newest first, de-duplicated by durable identity.
+- Recent searches: maximum 10, trimmed, case-insensitively de-duplicated, with the latest entered display form retained.
+- Favorites: no automatic count limit.
+
+Reload always returns the application to the package-picker state and requires explicit ZIP selection. Persisted UI metadata does not permit silent package reopening.
+
+### 5.4 Package replacement lifecycle
 
 - User selects a package on every run/session.
-- Reload resets the application completely.
+- Reload clears the active package session and returns to the package picker; only the approved UI metadata in §5.3 may persist.
 - Initial selection supports drag/drop and file picker.
 - After a package is loaded, global drag/drop replacement is disabled.
 - Replacement occurs only through an explicit `Change package` action.
@@ -254,9 +313,13 @@ Validation thresholds are derived from the actual current official ZIP with gene
 
 Safety checks include rejecting ambiguous/unsafe paths, duplicate normalized paths, encrypted archives, and archive structures that are implausible for the supported official package. ZIP hardening should remain proportionate to the product's intended happy path; this project is not a hostile-archive research platform.
 
-### 6.3 Icon ID
+### 6.3 Icon identity
 
-The stable in-session icon identifier is the normalized full path inside the ZIP.
+The stable in-session `IconEntry.id` is the normalized full path inside the ZIP, including the hidden packaging root when one exists. It remains the runtime/session identifier and is not used as the sole durable persisted identity.
+
+Persisted UI references use a separate canonical visible relative path derived from `categoryPath + originalFilename`, excluding the hidden packaging root. This allows a package-root rename to preserve Favorites/Recent without changing runtime ZIP identity semantics.
+
+When that visible path no longer exists, persisted re-matching may ignore only the mechanical numeric `NNNNN-icon-service-` filename prefix and accept the result only if exactly one current icon matches. Fuzzy matching is not a persistence identity mechanism.
 
 ### 6.4 Display name
 
@@ -551,6 +614,9 @@ Core/domain logic receives the deepest unit coverage, including:
 - display-name parser,
 - recursive category hierarchy,
 - search normalization and ranking,
+- stable persisted identity exact/fallback/ambiguity behavior,
+- persistence schema parsing and fail-safe storage behavior,
+- Favorite/Recent de-duplication, bounds, ordering, unmatched retention, and self-healing,
 - invalid package behavior,
 - session replacement/reset behavior,
 - original filename preservation.
