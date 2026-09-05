@@ -51,7 +51,8 @@ describe("startStaticServer", () => {
 
     const csp = response.headers.get("content-security-policy");
     expect(csp).toContain("default-src 'self'");
-    expect(csp).toContain("worker-src 'self' blob:");
+    expect(csp).toContain("script-src 'self'");
+    expect(csp).toContain("style-src 'self'");
     expect(csp).not.toContain("unsafe-eval");
     expect(csp).not.toContain("unsafe-inline");
   });
@@ -61,7 +62,7 @@ describe("startStaticServer", () => {
     const response = await fetch(server.url, { method: "HEAD" });
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("content-length")).toBeGreaterThan("0");
+    expect(Number(response.headers.get("content-length"))).toBeGreaterThan(0);
     await expect(response.text()).resolves.toBe("");
   });
 
