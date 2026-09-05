@@ -32,6 +32,7 @@ export function CategoryTree({
         <li>
           <button
             type="button"
+            aria-label={`All, ${formatIconCount(totalIcons)}`}
             aria-current={selectedCategory === null ? "page" : undefined}
             className={categoryButtonClass(selectedCategory === null)}
             onClick={() => onSelect(null)}
@@ -102,6 +103,7 @@ function CategoryNode({
         )}
         <button
           type="button"
+          aria-label={`${category.name}, ${formatIconCount(category.iconCount)}`}
           aria-current={isSelected ? "page" : undefined}
           className={`${categoryButtonClass(isSelected)} min-w-0 flex-1`}
           onClick={() => onSelect(category.id)}
@@ -143,4 +145,8 @@ function categoryButtonClass(selected: boolean): string {
       ? "bg-accent font-medium text-accent-foreground"
       : "text-muted-foreground hover:bg-muted hover:text-foreground",
   ].join(" ");
+}
+
+function formatIconCount(count: number): string {
+  return `${count} ${count === 1 ? "icon" : "icons"}`;
 }
