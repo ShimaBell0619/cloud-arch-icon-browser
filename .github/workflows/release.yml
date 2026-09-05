@@ -104,7 +104,7 @@ jobs:
         if: steps.activation.outputs.activated == 'true' && steps.release.outputs.published != 'true'
         run: npm publish --access public
 
-      - name: Verify npm publication
+      - name: Verify npm publication and tarball availability
         if: steps.activation.outputs.activated == 'true'
         shell: bash
         env:
@@ -112,9 +112,31 @@ jobs:
           PACKAGE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
-          observed="$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --json)"
-          observed="${observed//\"/}"
-          [[ "$observed" == "$PACKAGE_VERSION" ]]
+          max_attempts=24
+          delay_seconds=5
+
+          for attempt in $(seq 1 "$max_attempts"); do
+            observed="$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --json 2>/dev/null || true)"
+            observed="${observed//\"/}"
+
+            if [[ "$observed" == "$PACKAGE_VERSION" ]]; then
+              pack_dir="$(mktemp -d)"
+              if npm pack "$PACKAGE_NAME@$PACKAGE_VERSION" --pack-destination "$pack_dir" >/dev/null 2>&1; then
+                rm -rf "$pack_dir"
+                echo "npm registry metadata and tarball are available for $PACKAGE_NAME@$PACKAGE_VERSION."
+                exit 0
+              fi
+              rm -rf "$pack_dir"
+            fi
+
+            if [[ "$attempt" -eq "$max_attempts" ]]; then
+              echo "npm publication did not become fully installable after $max_attempts attempts." >&2
+              exit 1
+            fi
+
+            echo "npm publication not fully propagated yet (attempt $attempt/$max_attempts); retrying in ${delay_seconds}s..."
+            sleep "$delay_seconds"
+          done
 
       - name: Create immutable version tag
         if: steps.activation.outputs.activated == 'true' && steps.release.outputs.tag_exists != 'true'
