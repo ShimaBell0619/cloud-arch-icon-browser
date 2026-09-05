@@ -281,6 +281,7 @@ function parseRecentIconRecords(value: unknown): readonly RecentIconRecord[] {
     if (!reference || !isRecord(item) || !isTimestamp(item.openedAt)) return [];
     return [{ ...reference, openedAt: item.openedAt }];
   });
+  records.sort((left, right) => right.openedAt - left.openedAt);
   return dedupeByCanonicalPath(records).slice(0, RECENT_ICON_LIMIT);
 }
 
