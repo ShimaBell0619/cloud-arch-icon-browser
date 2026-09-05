@@ -1,0 +1,85 @@
+name: Issue 5 npm scope sync
+
+on:
+  push:
+    branches: [chore/issue-5-release-readiness]
+    paths:
+      - ".github/workflows/_issue5-npm-scope-sync.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: chore/issue-5-release-readiness
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Replace npm scope with account-owned scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          paths = [
+              Path('package.json'),
+              Path('package-lock.json'),
+              Path('README.md'),
+              Path('DESIGN.md'),
+              Path('docs/RELEASE.md'),
+          ]
+          old_full = '@shimabell0619/cloud-arch-icon-browser'
+          new_full = '@shimabell06/cloud-arch-icon-browser'
+          old_scope = '@shimabell0619'
+          new_scope = '@shimabell06'
+
+          for path in paths:
+              text = path.read_text()
+              text = text.replace(old_full, new_full).replace(old_scope, new_scope)
+              path.write_text(text)
+
+          validator = Path('scripts/validate-release-ready.mjs')
+          text = validator.read_text()
+          marker = 'const expectedRepository =\n  "https://github.com/ShimaBell0619/cloud-arch-icon-browser.git";\n'
+          if 'const expectedPackageName =' not in text:
+              if marker not in text:
+                  raise SystemExit('validator marker not found')
+              text = text.replace(
+                  marker,
+                  'const expectedPackageName = "@shimabell06/cloud-arch-icon-browser";\n' + marker,
+                  1,
+              )
+          check_marker = 'if (!/^@[a-z0-9][a-z0-9._-]*\\/[a-z0-9][a-z0-9._-]*$/u.test(packageJson.name)) {\n'
+          if 'packageJson.name !== expectedPackageName' not in text:
+              if check_marker not in text:
+                  raise SystemExit('validator package check marker not found')
+              text = text.replace(
+                  check_marker,
+                  'if (packageJson.name !== expectedPackageName) {\n'
+                  '  failures.push(`package name must be exactly ${expectedPackageName}`);\n'
+                  '}\n'
+                  + check_marker,
+                  1,
+              )
+          validator.write_text(text)
+          PY
+      - run: npm install --package-lock-only --ignore-scripts
+      - run: npm run check:fix
+      - run: npm run verify:release-ready
+      - name: Commit npm scope update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json README.md DESIGN.md docs/RELEASE.md scripts/validate-release-ready.mjs
+          git commit -m "fix: use npm account-owned package scope"
+          git pull --rebase origin chore/issue-5-release-readiness
+          git push origin HEAD:chore/issue-5-release-readiness
