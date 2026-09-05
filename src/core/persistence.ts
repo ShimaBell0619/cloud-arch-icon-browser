@@ -2,9 +2,9 @@ import {
   canonicalPersistedIconPath,
   createPersistedIconReference,
   matchPersistedIconReference,
-  persistedReferencesEqual,
   type PersistedIconMatchKind,
   type PersistedIconReference,
+  persistedReferencesEqual,
 } from "./persisted-identity";
 import type { IconEntry } from "./types";
 
@@ -242,7 +242,11 @@ function reconcileRecords<
       : ({ ...record, ...match.healedReference } as TRecord);
     if (healed !== record) changed = true;
     nextRecords.push(healed);
-    matches.push({ record: healed, icon: match.icon, matchedBy: match.matchedBy });
+    matches.push({
+      record: healed,
+      icon: match.icon,
+      matchedBy: match.matchedBy,
+    });
   }
 
   return { records: nextRecords, matches, changed };
@@ -251,7 +255,9 @@ function reconcileRecords<
 function parsePreferences(value: unknown): PersistedPreferences {
   if (!isRecord(value)) return { ...DEFAULT_PREFERENCES };
   return {
-    theme: isThemePreference(value.theme) ? value.theme : DEFAULT_PREFERENCES.theme,
+    theme: isThemePreference(value.theme)
+      ? value.theme
+      : DEFAULT_PREFERENCES.theme,
     view: isViewPreference(value.view) ? value.view : DEFAULT_PREFERENCES.view,
     sidebarCollapsed:
       typeof value.sidebarCollapsed === "boolean"
@@ -311,8 +317,7 @@ function parseIconReference(value: unknown): PersistedIconReference | null {
     return null;
   }
   if (
-    canonicalPath !==
-    canonicalPersistedIconPath(categoryPath, originalFilename)
+    canonicalPath !== canonicalPersistedIconPath(categoryPath, originalFilename)
   ) {
     return null;
   }
@@ -335,7 +340,7 @@ function normalizeRecentSearchKey(query: string): string {
 }
 
 function isTimestamp(value: unknown): value is number {
-  return Number.isSafeInteger(value) && typeof value === "number" && value >= 0;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function isThemePreference(value: unknown): value is ThemePreference {
