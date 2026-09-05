@@ -17,7 +17,9 @@ async function loadPackage(page) {
 }
 
 try {
-  const desktop = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const desktop = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+  });
   await desktop.goto(baseUrl, { waitUntil: "networkidle" });
   await desktop.screenshot({
     path: `${output}/01-unloaded-desktop.png`,
@@ -39,7 +41,9 @@ try {
     fullPage: true,
   });
 
-  const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const mobile = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
   await loadPackage(mobile);
   await mobile.screenshot({
     path: `${output}/04-loaded-mobile.png`,
