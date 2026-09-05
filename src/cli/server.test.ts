@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -131,6 +131,24 @@ describe("startStaticServer", () => {
     const response = await fetch(`${server.url}api/icons`);
 
     expect(response.status).toBe(404);
+  });
+
+  it("rejects symbolic links in the static build output", async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), "cloud-arch-server-"));
+    try {
+      await writeFile(
+        join(rootDirectory, "index.html"),
+        "<!doctype html><title>fixture app</title>",
+        "utf8",
+      );
+      await symlink("index.html", join(rootDirectory, "linked.html"));
+
+      await expect(startStaticServer({ rootDirectory })).rejects.toThrow(
+        "must not contain symbolic links",
+      );
+    } finally {
+      await rm(rootDirectory, { recursive: true, force: true });
+    }
   });
 });
 
