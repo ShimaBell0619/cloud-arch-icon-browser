@@ -5,11 +5,15 @@ import { expect, test } from "@playwright/test";
 const fixture =
   process.env.E2E_FIXTURE ?? "/tmp/cloud-arch-icon-browser-e2e-fixture.zip";
 
+function resultStatus(page) {
+  return page.locator("header").getByRole("status");
+}
+
 async function loadPackage(page) {
   await page.goto("/");
   await page.getByLabel("Choose icon package ZIP").setInputFiles(fixture);
   await page.getByRole("searchbox", { name: "Search icons" }).waitFor();
-  await expect(page.getByRole("status")).toContainText("12 icons");
+  await expect(resultStatus(page)).toContainText("12 icons");
 }
 
 async function expectNoAxeViolations(page) {
@@ -37,21 +41,21 @@ test("loads a local package, browses, searches, opens details, and downloads ori
 
   const search = page.getByRole("searchbox", { name: "Search icons" });
   await page.getByRole("button", { name: "Compute, 4 icons" }).click();
-  await expect(page.getByRole("status")).toContainText("4 icons");
+  await expect(resultStatus(page)).toContainText("4 icons");
 
   await page.getByRole("button", { name: "Change package" }).focus();
   await page.keyboard.press("/");
   await expect(search).toBeFocused();
 
   await search.fill("functions");
-  await expect(page.getByRole("status")).toContainText("1 icon");
+  await expect(resultStatus(page)).toContainText("1 icon");
   await expect(
     page.getByRole("button", { name: "Functions, Compute" }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(search).toBeFocused();
-  await expect(page.getByRole("status")).toContainText("4 icons");
+  await expect(resultStatus(page)).toContainText("4 icons");
 
   const appService = page.getByRole("button", {
     name: "App Service, Compute",
