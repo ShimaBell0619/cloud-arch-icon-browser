@@ -71,7 +71,7 @@ See:
 
 - [`DESIGN.md`](./DESIGN.md) — product and architecture source of truth.
 - [`AGENTS.md`](./AGENTS.md) — repository instructions for coding agents.
-- [`COMPATIBILITY.md`](./COMPATIBILITY.md) — last manually verified official icon package.
+- [`COMPATIBILITY.md`](./COMPATIBILITY.md) — official package compatibility and verification status.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — contribution workflow.
 - [`SECURITY.md`](./SECURITY.md) — vulnerability reporting policy.
 
