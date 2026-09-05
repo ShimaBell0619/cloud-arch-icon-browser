@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const cliPath = fileURLToPath(new URL("../dist/cli/index.js", import.meta.url));
+const cliPath = fileURLToPath(new URL("../cli/index.js", import.meta.url));
 const packageJson = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 );
