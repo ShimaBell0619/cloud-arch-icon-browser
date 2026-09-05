@@ -1,7 +1,7 @@
 {
-  "name": "cloud-arch-icon-browser",
+  "name": "@shimabell0619/cloud-arch-icon-browser",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "A local browser for user-provided architecture icon packages.",
   "license": "MIT",
   "repository": {
