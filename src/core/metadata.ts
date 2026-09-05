@@ -4,10 +4,27 @@ import { compareNames, parseDisplayName } from "./names";
 import { normalizeZipPath } from "./paths";
 import type { IconEntry, PackageEntryMetadata, PackageMetadata } from "./types";
 
+/**
+ * Upper plausibility limits derived from the current V24 package shape.
+ * V24 contains 624 browsable SVGs; these caps intentionally leave generous
+ * headroom without hard-coding a package version or category taxonomy.
+ */
+export const PACKAGE_STRUCTURE_LIMITS = Object.freeze({
+  maxEntries: 4_096,
+  maxBrowsableSvgs: 2_048,
+});
+
 export function parsePackageMetadata(
   entries: readonly PackageEntryMetadata[],
   archiveSize: number,
 ): PackageMetadata {
+  if (entries.length > PACKAGE_STRUCTURE_LIMITS.maxEntries) {
+    throw invalidPackage(
+      "INVALID_METADATA",
+      "The ZIP contains an implausible number of entries for the supported icon package.",
+    );
+  }
+
   const paths = new Map<string, PackageEntryMetadata>();
   const svgEntries: { entry: PackageEntryMetadata; path: string }[] = [];
   for (const entry of entries) {
@@ -56,6 +73,12 @@ export function parsePackageMetadata(
       );
     }
     svgEntries.push({ entry, path });
+    if (svgEntries.length > PACKAGE_STRUCTURE_LIMITS.maxBrowsableSvgs) {
+      throw invalidPackage(
+        "INVALID_METADATA",
+        "The ZIP contains an implausible number of SVG icons for the supported icon package.",
+      );
+    }
   }
   for (const path of paths.keys()) {
     let end = path.indexOf("/");
