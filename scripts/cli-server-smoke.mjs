@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const cliPath = fileURLToPath(new URL("../dist/cli/index.js", import.meta.url));
+const cliPath = fileURLToPath(new URL("../cli/index.js", import.meta.url));
 const child = spawn(process.execPath, [cliPath], {
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -24,7 +24,9 @@ try {
   const response = await fetch(url);
   assert(response.status === 200, `GET / returned ${response.status}`);
   assert(
-    response.headers.get("content-security-policy")?.includes("script-src 'self'"),
+    response.headers
+      .get("content-security-policy")
+      ?.includes("script-src 'self'"),
     "GET / did not include the expected CSP",
   );
 
