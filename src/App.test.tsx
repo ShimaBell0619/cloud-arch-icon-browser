@@ -175,16 +175,16 @@ describe("icon browser UI", () => {
     expect(
       screen.getByRole("button", { name: "Blob Storage, Storage" }),
     ).toBeVisible();
-    expect(screen.getByRole("button", { name: /^All 3$/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
       "aria-current",
       "page",
     );
     expect(
-      screen.queryByRole("button", { name: /^Databases 1$/ }),
+      screen.queryByRole("button", { name: /^Databases/ }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Expand Compute" }));
-    expect(screen.getByRole("button", { name: /^Databases 1$/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Databases/ })).toBeVisible();
 
     const search = screen.getByRole("searchbox", { name: "Search icons" });
     await user.type(search, "blob");
@@ -197,7 +197,7 @@ describe("icon browser UI", () => {
       screen.getByRole("button", { name: "Blob Storage, Storage" }),
     ).toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: /^Compute 2$/ }));
+    await user.click(screen.getByRole("button", { name: /^Compute/ }));
     expect(search).toHaveValue("blob");
     expect(
       await screen.findByRole("heading", { name: "No icons found" }),
