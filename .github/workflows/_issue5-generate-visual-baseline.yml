@@ -45,3 +45,5 @@ jobs:
           git add tests/e2e
           git commit -m "test: record stable Linux visual baselines"
           git push origin HEAD:chore/issue-5-release-readiness
+
+# Temporary workflow; remove after the baselines are committed.
