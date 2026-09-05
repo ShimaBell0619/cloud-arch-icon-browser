@@ -135,7 +135,7 @@ ZIP path arguments, verbose mode, custom host, custom port, and `--no-open` are 
 - Development and CI use Node 24.20.0 via `.node-version`.
 - `package.json` runtime engine must match the supported range above.
 - Supported operating systems: Windows, macOS, Linux.
-- Package is ESM-only (`"type": "module").
+- Package is ESM-only (`"type": "module"`).
 - Package manager: npm.
 - `package-lock.json` is committed.
 - CI and release use `npm ci`.
