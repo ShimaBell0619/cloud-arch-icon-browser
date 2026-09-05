@@ -60,6 +60,8 @@ export function App() {
   const [loadError, setLoadError] = useState<PackageProblem | null>(null);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     return () => {
       mountedRef.current = false;
       operationRef.current += 1;
