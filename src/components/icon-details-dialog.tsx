@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
 import { DownloadIcon, XIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useRef, useState } from "react";
 import { LazyIconPreview } from "@/components/lazy-icon-preview";
-import { PackageError, type IconEntry, type IconPackageSession } from "@/core";
+import { Button } from "@/components/ui/button";
+import { type IconEntry, type IconPackageSession, PackageError } from "@/core";
 
 interface IconDetailsDialogProps {
   session: IconPackageSession;
