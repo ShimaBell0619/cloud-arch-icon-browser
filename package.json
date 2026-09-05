@@ -39,6 +39,7 @@
     "test:cli-package-smoke": "node scripts/cli-package-smoke.mjs",
     "verify:package": "node scripts/validate-package.mjs",
     "verify:official": "node scripts/verify-official.mjs",
+    "verify:release-ready": "node scripts/validate-release-ready.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts"
   },
