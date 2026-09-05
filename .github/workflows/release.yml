@@ -1,0 +1,146 @@
+name: Publish release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - CHANGELOG.md
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: activation
+        name: Check whether npm publication is activated
+        shell: bash
+        run: |
+          if [[ "$(node -p "require('./package.json').private === true")" == "true" ]]; then
+            echo "activated=false" >> "$GITHUB_OUTPUT"
+            echo "Publication is intentionally disabled while package.json has private=true."
+          else
+            echo "activated=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: steps.activation.outputs.activated == 'true'
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+
+      - if: steps.activation.outputs.activated == 'true'
+        run: npm ci
+
+      - name: Validate release metadata and official-package gate
+        if: steps.activation.outputs.activated == 'true'
+        run: npm run verify:release-ready
+
+      - name: Block High/Critical dependency vulnerabilities
+        if: steps.activation.outputs.activated == 'true'
+        run: npm audit --audit-level=high
+
+      - name: Re-run deterministic release checks
+        if: steps.activation.outputs.activated == 'true'
+        run: |
+          npm run check
+          npm test
+          npm run build
+          npm run test:cli-package-smoke
+          npm run verify:package
+
+      - id: release
+        name: Resolve immutable version/tag state
+        if: steps.activation.outputs.activated == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          tag="v$version"
+
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          if git show-ref --verify --quiet "refs/tags/$tag"; then
+            tagged_sha="$(git rev-list -n 1 "$tag")"
+            if [[ "$tagged_sha" != "$GITHUB_SHA" ]]; then
+              echo "Refusing to move immutable tag $tag from $tagged_sha to $GITHUB_SHA." >&2
+              exit 1
+            fi
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if observed="$(npm view "$name@$version" version --json 2>/dev/null)"; then
+            observed="${observed//\"/}"
+            if [[ "$observed" != "$version" ]]; then
+              echo "Registry returned unexpected version '$observed' for $name@$version." >&2
+              exit 1
+            fi
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm with Trusted Publishing (OIDC)
+        if: steps.activation.outputs.activated == 'true' && steps.release.outputs.published != 'true'
+        run: npm publish --access public
+
+      - name: Verify npm publication
+        if: steps.activation.outputs.activated == 'true'
+        shell: bash
+        env:
+          PACKAGE_NAME: ${{ steps.release.outputs.name }}
+          PACKAGE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          observed="$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --json)"
+          observed="${observed//\"/}"
+          [[ "$observed" == "$PACKAGE_VERSION" ]]
+
+      - name: Create immutable version tag
+        if: steps.activation.outputs.activated == 'true' && steps.release.outputs.tag_exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$RELEASE_TAG" \
+            -f sha="$GITHUB_SHA"
+
+      - name: Create GitHub Release
+        if: steps.activation.outputs.activated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "GitHub Release $RELEASE_TAG already exists."
+          else
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "$RELEASE_TAG" \
+              --generate-notes
+          fi

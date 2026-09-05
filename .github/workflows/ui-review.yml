@@ -62,11 +62,9 @@ jobs:
         if: steps.browser-ui.outputs.available == 'true'
         run: npm ci
 
-      - name: Install Playwright Chromium
+      - name: Install pinned Playwright Chromium
         if: steps.browser-ui.outputs.available == 'true'
-        run: |
-          npm install --no-save --package-lock=false playwright@1.55.0
-          npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Create project-owned review fixture
         if: steps.browser-ui.outputs.available == 'true'

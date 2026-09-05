@@ -1,9 +1,16 @@
 {
-  "name": "cloud-arch-icon-browser",
+  "name": "@shimabell06/cloud-arch-icon-browser",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "A local browser for user-provided architecture icon packages.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShimaBell0619/cloud-arch-icon-browser.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "cloud-arch-icon-browser": "cli/index.js"
@@ -12,6 +19,7 @@
     "cli",
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"
   ],
@@ -25,11 +33,18 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.cli.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "playwright test tests/e2e/visual.spec.mjs --update-snapshots",
     "build:cli": "tsc -p tsconfig.cli.json",
     "build": "node scripts/clean-build.mjs && npm run typecheck && vite build && npm run build:cli",
     "preview": "vite preview",
     "test:cli-smoke": "node scripts/cli-smoke.mjs",
-    "test:cli-package-smoke": "node scripts/cli-package-smoke.mjs"
+    "test:cli-package-smoke": "node scripts/cli-package-smoke.mjs",
+    "verify:package": "node scripts/validate-package.mjs",
+    "verify:official": "node scripts/verify-official.mjs",
+    "verify:release-ready": "node scripts/validate-release-ready.mjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts"
   },
   "dependencies": {
     "@base-ui/react": "1.8.0",
@@ -45,7 +60,10 @@
     "tailwind-merge": "3.6.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@biomejs/biome": "2.5.12",
+    "@changesets/cli": "2.29.7",
+    "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.3",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",

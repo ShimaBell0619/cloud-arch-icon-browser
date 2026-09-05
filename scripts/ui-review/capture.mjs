@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { chromium } from "playwright";
+import { chromium } from "@playwright/test";
 
 const baseUrl = process.env.UI_REVIEW_BASE_URL ?? "http://127.0.0.1:5173/";
 const fixture = process.env.UI_REVIEW_FIXTURE ?? "/tmp/ui-review-fixture.zip";

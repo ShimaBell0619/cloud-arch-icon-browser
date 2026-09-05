@@ -62,19 +62,19 @@ Future ideas must remain explicitly marked as future work and must not be implem
 
 - Repository base name: `cloud-arch-icon-browser`.
 - npm package base name: `cloud-arch-icon-browser`.
-- npm package will be scoped, for example `@<npm-scope>/cloud-arch-icon-browser`.
+- npm package name: `@shimabell06/cloud-arch-icon-browser`.
 - CLI binary name: `cloud-arch-icon-browser`.
-- Exact npm scope is intentionally unresolved until publication setup.
+- npm scope: `@shimabell06`.
 - App/package branding must not contain `Azure` or `Microsoft` in the product name.
 
 ### 2.2 Supported distribution
 
 MVP officially supports npm/npx only.
 
-Planned usage:
+Supported usage:
 
 ```bash
-npx @<npm-scope>/cloud-arch-icon-browser
+npx @shimabell06/cloud-arch-icon-browser
 ```
 
 The package contains both the CLI and the prebuilt Web UI.
