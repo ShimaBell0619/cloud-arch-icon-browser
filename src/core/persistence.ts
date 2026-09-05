@@ -216,9 +216,7 @@ export function reconcilePersistedStateWithIcons(
   };
 }
 
-function reconcileRecords<
-  TRecord extends PersistedIconReference & Record<string, unknown>,
->(
+function reconcileRecords<TRecord extends PersistedIconReference>(
   records: readonly TRecord[],
   icons: readonly IconEntry[],
 ): {
