@@ -1,11 +1,13 @@
-import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const zipPath = process.argv[2];
 if (!zipPath) {
-  console.error("Usage: npm run verify:official -- /path/to/official-icons.zip");
+  console.error(
+    "Usage: npm run verify:official -- /path/to/official-icons.zip",
+  );
   process.exit(1);
 }
 

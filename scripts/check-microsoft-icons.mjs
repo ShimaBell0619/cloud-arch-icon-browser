@@ -11,7 +11,7 @@ const DEFAULT_BASELINE = fileURLToPath(
 
 const writeIndex = process.argv.indexOf("--write-baseline");
 const writeBaselinePath =
-  writeIndex >= 0 ? process.argv[writeIndex + 1] ?? DEFAULT_BASELINE : null;
+  writeIndex >= 0 ? (process.argv[writeIndex + 1] ?? DEFAULT_BASELINE) : null;
 
 const response = await fetch(PAGE_URL, {
   headers: {
@@ -102,7 +102,8 @@ function observePage(source) {
 
   const packageUrl = uniqueZips[0];
   const encodedFilename = new URL(packageUrl).pathname.split("/").pop();
-  if (!encodedFilename) throw new Error("Official ZIP URL did not contain a filename.");
+  if (!encodedFilename)
+    throw new Error("Official ZIP URL did not contain a filename.");
 
   const packageFilename = decodeURIComponent(encodedFilename);
   const generalGuidelines = extractSectionText(source, "general-guidelines");
@@ -127,7 +128,8 @@ function extractSectionText(source, id) {
   const start = match.index + match[0].length;
   const remaining = source.slice(start);
   const nextHeading = remaining.search(/<h2\b/i);
-  const section = nextHeading >= 0 ? remaining.slice(0, nextHeading) : remaining;
+  const section =
+    nextHeading >= 0 ? remaining.slice(0, nextHeading) : remaining;
   const text = normalizeHtmlText(section);
   if (!text) throw new Error(`Microsoft Learn section #${id} was empty.`);
   return text;

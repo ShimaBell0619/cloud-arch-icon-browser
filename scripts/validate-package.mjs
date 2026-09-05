@@ -55,7 +55,9 @@ for (const file of files) {
   }
 
   if (segments.some((segment) => forbiddenSegments.has(segment))) {
-    violations.push(`${normalized}: development/test content must not be published`);
+    violations.push(
+      `${normalized}: development/test content must not be published`,
+    );
   }
 
   const extension = path.posix.extname(normalized).toLowerCase();
@@ -63,8 +65,14 @@ for (const file of files) {
     violations.push(`${normalized}: ZIP/SVG assets must not be published`);
   }
 
-  if (/azure[_-]public[_-]service[_-]icons|architecture[_-]icons/i.test(normalized)) {
-    violations.push(`${normalized}: looks like an official Microsoft icon-package asset`);
+  if (
+    /azure[_-]public[_-]service[_-]icons|architecture[_-]icons/i.test(
+      normalized,
+    )
+  ) {
+    violations.push(
+      `${normalized}: looks like an official Microsoft icon-package asset`,
+    );
   }
 }
 

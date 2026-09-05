@@ -23,14 +23,21 @@ if (!/^\d+\.\d+\.\d+$/u.test(packageJson.version)) {
 if (packageJson.repository?.url !== expectedRepository) {
   failures.push(`repository.url must be exactly ${expectedRepository}`);
 }
-if (packageLock.name !== packageJson.name || packageLock.version !== packageJson.version) {
-  failures.push("package-lock.json top-level name/version must match package.json");
+if (
+  packageLock.name !== packageJson.name ||
+  packageLock.version !== packageJson.version
+) {
+  failures.push(
+    "package-lock.json top-level name/version must match package.json",
+  );
 }
 if (
   packageLock.packages?.[""]?.name !== packageJson.name ||
   packageLock.packages?.[""]?.version !== packageJson.version
 ) {
-  failures.push("package-lock.json root package metadata must match package.json");
+  failures.push(
+    "package-lock.json root package metadata must match package.json",
+  );
 }
 
 const compatibility = await readFile("COMPATIBILITY.md", "utf8");
@@ -46,4 +53,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Release readiness gate passed for ${packageJson.name}@${packageJson.version}.`);
+console.log(
+  `Release readiness gate passed for ${packageJson.name}@${packageJson.version}.`,
+);

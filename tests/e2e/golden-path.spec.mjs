@@ -27,7 +27,10 @@ async function expectNoAxeViolations(page) {
       .map(
         (violation) =>
           `${violation.id}: ${violation.help}\n${violation.nodes
-            .map((node) => `  ${node.target.join(" ")}: ${node.failureSummary ?? ""}`)
+            .map(
+              (node) =>
+                `  ${node.target.join(" ")}: ${node.failureSummary ?? ""}`,
+            )
             .join("\n")}`,
       )
       .join("\n\n"),
@@ -65,7 +68,9 @@ test("loads a local package, browses, searches, opens details, and downloads ori
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("heading", { name: "App Service" })).toBeVisible();
+  await expect(
+    dialog.getByRole("heading", { name: "App Service" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Close icon details" }),
   ).toBeFocused();

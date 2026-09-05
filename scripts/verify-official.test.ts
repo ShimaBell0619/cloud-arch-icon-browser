@@ -1,11 +1,13 @@
-import { basename } from "node:path";
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { afterAll, expect, test } from "vitest";
 import { IconPackageSession } from "../src/core/index";
 
 const zipPath = process.env.VERIFY_OFFICIAL_ZIP;
 if (!zipPath) {
-  throw new Error("VERIFY_OFFICIAL_ZIP is required. Use npm run verify:official -- <zip>.");
+  throw new Error(
+    "VERIFY_OFFICIAL_ZIP is required. Use npm run verify:official -- <zip>.",
+  );
 }
 
 let session: IconPackageSession | null = null;
@@ -49,5 +51,7 @@ test("official package passes the production parser and validator", async () => 
 
   console.log("\nCompatibility verification record:\n");
   console.log(JSON.stringify(record, null, 2));
-  console.log("\nCopy the measured metadata into COMPATIBILITY.md before release.\n");
+  console.log(
+    "\nCopy the measured metadata into COMPATIBILITY.md before release.\n",
+  );
 });

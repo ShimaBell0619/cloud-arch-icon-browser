@@ -15,7 +15,9 @@ test("initial package screen", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Open your architecture icon package" }),
   ).toBeVisible();
-  await expect(page).toHaveScreenshot("initial-package.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("initial-package.png", {
+    fullPage: true,
+  });
 });
 
 test("loaded icon grid", async ({ page }) => {
