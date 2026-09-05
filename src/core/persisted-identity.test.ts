@@ -51,7 +51,10 @@ describe("persisted icon identity", () => {
       "Web",
     );
 
-    const result = matchPersistedIconReference(saved, [sameNameElsewhere, exact]);
+    const result = matchPersistedIconReference(saved, [
+      sameNameElsewhere,
+      exact,
+    ]);
 
     expect(result?.matchedBy).toBe("exact-path");
     expect(result?.icon).toBe(exact);
@@ -90,10 +93,7 @@ describe("persisted icon identity", () => {
     const saved = createPersistedIconReference(
       icon("10035-icon-service-App-Service.svg", "Old"),
     );
-    const merelySimilar = icon(
-      "10999-icon-service-App-Services.svg",
-      "Web",
-    );
+    const merelySimilar = icon("10999-icon-service-App-Services.svg", "Web");
 
     expect(matchPersistedIconReference(saved, [merelySimilar])).toBeNull();
   });
