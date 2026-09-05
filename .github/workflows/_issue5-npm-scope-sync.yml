@@ -71,6 +71,7 @@ jobs:
           validator.write_text(text)
           PY
       - run: npm install --package-lock-only --ignore-scripts
+      - run: npm ci
       - run: npm run check:fix
       - run: npm run verify:release-ready
       - name: Commit npm scope update
