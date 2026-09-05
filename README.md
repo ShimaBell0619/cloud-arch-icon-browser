@@ -35,11 +35,43 @@ The app may provide manual links to Microsoft documentation, but it does not aut
 
 ## Project status
 
-The design baseline is established before implementation. See:
+The project foundation is available as a minimal local development shell. ZIP
+loading, browsing/search, the production CLI, and release automation are not yet
+implemented. The npm package remains private until publication setup resolves
+the scope and packaging requirements.
+
+## Development
+
+Use the exact Node 24 version in [`.node-version`](./.node-version) and npm:
+
+```bash
+npm ci
+npm run dev
+```
+
+Open the URL printed by Vite. Development and preview servers bind to `127.0.0.1`.
+Geist Sans Variable and all UI dependencies are bundled locally; the only external
+link in the shell opens Microsoft Learn when clicked.
+
+```bash
+npm run check
+npm run typecheck
+npm test
+npm run build
+npm run preview
+```
+
+`check:fix` applies Biome fixes; `test:watch` runs Vitest interactively. `build`
+typechecks the project and writes the web UI to `dist/`. `preview` is a development
+tool for inspecting that build, not the planned production CLI/server.
+
+## Project documents
+
+See:
 
 - [`DESIGN.md`](./DESIGN.md) — product and architecture source of truth.
 - [`AGENTS.md`](./AGENTS.md) — repository instructions for coding agents.
-- [`COMPATIBILITY.md`](./COMPATIBILITY.md) — last manually verified official icon package.
+- [`COMPATIBILITY.md`](./COMPATIBILITY.md) — official package compatibility and verification status.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — contribution workflow.
 - [`SECURITY.md`](./SECURITY.md) — vulnerability reporting policy.
 

@@ -43,6 +43,34 @@ Use project-owned minimal SVG/ZIP fixtures for tests.
 - Prefer existing shadcn primitives for UI building blocks.
 - Keep accessibility and keyboard behavior intact.
 
+## Local development and checks
+
+Use the Node version pinned in `.node-version`, then run `npm ci`. Start the
+minimal shell with `npm run dev`. Before opening a PR, run:
+
+```bash
+npm run check
+npm run typecheck
+npm test
+npm run build
+```
+
+Use `npm run check:fix` for formatting/import fixes and `npm run test:watch` for
+interactive tests. Direct dependencies must stay exact-pinned; `.npmrc` sets
+`save-exact=true` and enforces the Node engine requirement.
+
+UI primitives live in `src/components/ui`; application composition lives outside
+that directory. `components.json` selects the Base UI-backed `base-rhea` style.
+The initial Button comes from the official Rhea registry with the local `cn`
+helper and semantic hover token. Keep future primitive additions thin and retain
+upstream notices. Theme tokens and system-driven dark mode live in `src/index.css`.
+
+Vitest uses jsdom, React Testing Library, and the cleanup setup in `src/test`.
+Foundation CI runs the commands above on Linux; CodeQL scans JavaScript/TypeScript.
+Core coverage gates belong to Issue #2. Playwright, accessibility/visual checks,
+cross-platform CLI smoke checks, package validation, and Changesets/release
+automation follow in the later implementation issues.
+
 ## Pull requests
 
 Use a short-lived branch and open a PR to `main`.
