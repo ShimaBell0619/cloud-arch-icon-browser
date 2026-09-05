@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- tests/e2e; then
+          if [[ -z "$(git status --porcelain -- tests/e2e)" ]]; then
             echo "No visual snapshot changes."
             exit 0
           fi
