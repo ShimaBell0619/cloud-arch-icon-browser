@@ -1,143 +1,160 @@
 # Release Runbook
 
-This project uses Changesets for release intent and GitHub Actions for publication. The steady-state publication path uses npm Trusted Publishing (OIDC); no long-lived npm publish token belongs in this repository.
+This project uses Changesets for release intent and GitHub Actions for publication. Normal publication uses npm Trusted Publishing (OIDC); no long-lived npm publish token belongs in this repository.
 
-## Current v0.1.0 publication state
+## Current release state
 
-The final npm package name is:
+The first public release, `v0.1.0`, was published on 2026-09-06 (JST).
+
+Package:
 
 ```text
 @shimabell06/cloud-arch-icon-browser
 ```
 
-The v0.1.0 publication PR sets `private=false` and `publishConfig.access=public`. The current official `Azure_Public_Service_Icons_V24.zip` has passed the production-parser verification recorded in `COMPATIBILITY.md`, so the compatibility release gate is now `PASS`.
+Current publication contract:
 
-Before merging the v0.1.0 publication PR, a maintainer must complete the remaining npm account/bootstrap steps:
+- npm package access is public.
+- GitHub Actions publishes through npm Trusted Publishing/OIDC.
+- npm publication includes provenance generated from the GitHub Actions build identity.
+- `package.json`, npm, the immutable `vX.Y.Z` Git tag, and the GitHub Release must use the same version.
+- The release workflow is idempotent: an already-published npm version is detected and is not published again.
+- Git tag and GitHub Release creation happen only after npm metadata **and the package tarball** are retrievable.
 
-1. Complete the one-time npm package bootstrap described below.
-2. Configure npm Trusted Publishing for the package and this repository's `release.yml` workflow.
-3. Confirm normal PR CI is green, then merge the publication PR.
+The current official `Azure_Public_Service_Icons_V24.zip` has passed the production-parser verification recorded in [`COMPATIBILITY.md`](../COMPATIBILITY.md).
 
-When `private=false`, `npm run verify:release-ready` makes the scoped package name, repository URL, lockfile metadata, stable SemVer, and compatibility PASS record mandatory.
+## Normal release flow
 
-For future Microsoft package updates, download the current official ZIP separately, run `npm run verify:official -- /path/to/latest-official.zip`, and update `COMPATIBILITY.md` only after successful production-parser verification. Never commit the Microsoft ZIP or SVG assets.
+For a user-visible or package-relevant change:
 
-## One-time npm bootstrap
-
-A Trusted Publisher is configured against an npm package that already exists. For the first publication of `@shimabell06/cloud-arch-icon-browser`, create the registry package once without consuming the intended `v0.1.0` release.
-
-Use a disposable clean copy/worktree. Do not commit the bootstrap version to the repository.
-
-1. Install and validate the release candidate:
-
-   ```bash
-   npm ci
-   npm run check
-   npm test
-   npm run build
-   npm run test:cli-package-smoke
-   npm run verify:package
-   npm run verify:release-ready
-   ```
-
-2. In the disposable copy only, set version `0.0.0`:
-
-   ```bash
-   npm version 0.0.0 --no-git-tag-version
-   ```
-
-3. Authenticate interactively to npm with the maintainer account and its required 2FA/passkey controls:
-
-   ```bash
-   npm login
-   ```
-
-4. Publish only the bootstrap version under a non-default dist-tag:
-
-   ```bash
-   npm publish --access public --tag bootstrap
-   ```
-
-5. Configure the Trusted Publisher for the newly created package. In npmjs.com use:
-   - Provider: GitHub Actions
-   - Organization or user: `ShimaBell0619`
-   - Repository: `cloud-arch-icon-browser`
-   - Workflow filename: `release.yml`
-   - Environment: leave blank unless a GitHub Environment is deliberately introduced
-   - Allowed actions: enable direct `npm publish`
-
-   With a current npm CLI, the equivalent interactive configuration can be performed with:
-
-   ```bash
-   npm trust github @shimabell06/cloud-arch-icon-browser \
-     --repo ShimaBell0619/cloud-arch-icon-browser \
-     --file release.yml \
-     --allow-publish
-   ```
-
-6. Discard the disposable `0.0.0` package changes. The repository remains at `0.1.0`.
-7. After the first successful OIDC release, remove the `bootstrap` dist-tag if it is no longer useful. The published `0.0.0` version remains historical registry metadata.
-8. After OIDC is proven, set npm Publishing access to the strongest appropriate setting, preferably **Require two-factor authentication and disallow tokens**.
-
-If npm later supports establishing a Trusted Publisher for a never-published package without a bootstrap version, prefer that supported flow and update this runbook.
-
-## Trusted Publishing contract
-
-`.github/workflows/release.yml` runs on a GitHub-hosted Ubuntu runner and grants `id-token: write`. It uses the Node version pinned by `.node-version`, which satisfies npm Trusted Publishing minimums.
-
-The workflow intentionally does not use `NPM_TOKEN`. npm exchanges the GitHub OIDC identity during `npm publish`. The Trusted Publisher must explicitly permit direct `npm publish` because new configurations default to staged publishing permission.
-
-The `repository.url` in `package.json` must remain exactly:
-
-```text
-https://github.com/ShimaBell0619/cloud-arch-icon-browser.git
-```
-
-The npm Trusted Publisher configuration must point to the exact workflow filename `release.yml`.
-
-## Release-time gates
-
-When publication is activated, `release.yml` performs these gates before publishing:
-
-1. `npm run verify:release-ready`
-2. `npm audit --audit-level=high` — High/Critical findings fail the release
-3. formatting/lint checks and unit tests
-4. production build
-5. packaged CLI smoke test
-6. `npm pack --dry-run` content validation via `npm run verify:package`
-7. npm registry version check
-
-The package-content validation rejects development/test directories, ZIP files, SVG assets, and non-allowlisted top-level paths.
-
-## Version, tag, and GitHub Release
-
-`package.json` is the version authority for publication. For version `X.Y.Z`, the release workflow derives the immutable tag `vX.Y.Z`.
-
-The workflow publishes/checks `name@X.Y.Z` first, then creates `vX.Y.Z`, then creates the GitHub Release for that same tag. It never moves an existing version tag. If a tag already exists at a different commit, the release fails.
-
-This order permits recovery if npm accepted a publish but tag/Release creation failed: a rerun detects the existing registry version and continues with missing GitHub metadata instead of attempting to republish the immutable npm version.
-
-## Normal post-v0.1.0 release flow
-
-For a user-visible/package-relevant change:
-
-1. In the feature/fix PR, run:
+1. Add an appropriate Changeset in the feature/fix PR:
 
    ```bash
    npm run changeset
    ```
 
 2. Select the SemVer bump and describe the release-facing change.
-3. Merge the PR to `main` after CI passes.
-4. `.github/workflows/release-pr.yml` aggregates pending Changesets into `chore: release packages`.
+3. Merge the PR to `main` after required CI passes.
+4. `.github/workflows/release-pr.yml` aggregates pending Changesets into the `chore: release packages` PR.
 5. Review and merge that release PR.
-6. The package version change triggers `.github/workflows/release.yml`.
-7. Verify the npm version/provenance, immutable `vX.Y.Z` tag, and matching GitHub Release.
+6. The resulting `package.json` / `package-lock.json` / `CHANGELOG.md` change triggers `.github/workflows/release.yml`.
+7. Verify the published npm version and provenance, immutable `vX.Y.Z` tag, and matching GitHub Release.
 
-The initial `v0.1.0` is a bootstrap exception because the repository already started at version `0.1.0`; this release-readiness PR intentionally does not add a version-bumping Changeset.
+Docs-only or internal changes that do not alter packaged/user-visible release content normally do not require a Changeset.
+
+## Trusted Publishing contract
+
+`.github/workflows/release.yml` runs on a GitHub-hosted Ubuntu runner and grants `id-token: write`. It uses the Node version pinned by `.node-version`.
+
+The workflow intentionally does not use `NPM_TOKEN`. npm exchanges the GitHub OIDC identity during `npm publish`.
+
+The npm Trusted Publisher is configured for:
+
+- Provider: GitHub Actions
+- Repository: `ShimaBell0619/cloud-arch-icon-browser`
+- Workflow filename: `release.yml`
+- Direct `npm publish`: allowed
+- Stage publish: allowed
+
+The `repository.url` in `package.json` must remain:
+
+```text
+https://github.com/ShimaBell0619/cloud-arch-icon-browser.git
+```
+
+The Trusted Publisher must continue to point to the exact workflow filename `release.yml`.
+
+## Release-time gates
+
+When publication is activated, `release.yml` performs these checks before and after publishing:
+
+1. `npm run verify:release-ready`
+2. `npm audit --audit-level=high` — High/Critical findings fail the release
+3. Biome checks and unit tests
+4. production build
+5. packaged CLI smoke test
+6. package-content validation via `npm run verify:package`
+7. existing npm version lookup for idempotent recovery
+8. OIDC `npm publish --access public` when the version is not already published
+9. post-publish registry propagation verification
+10. immutable Git tag creation
+11. GitHub Release creation
+
+Package-content validation rejects development/test directories, ZIP files, SVG assets, and non-allowlisted top-level paths.
+
+### Registry/tarball propagation verification
+
+A successful `npm publish` response does not guarantee that every registry/CDN endpoint is immediately ready. During the `v0.1.0` release, package metadata became visible before the tarball was consistently retrievable.
+
+The workflow therefore verifies both:
+
+- `npm view <name>@<version> version`
+- `npm pack <name>@<version>`
+
+The check retries every 5 seconds for up to 24 attempts (approximately 2 minutes). The workflow does not create the version tag or GitHub Release until both metadata and the actual tarball are available.
+
+This makes release completion correspond to practical installability rather than metadata visibility alone.
+
+## Version, tag, and GitHub Release
+
+`package.json` is the version authority for publication. For version `X.Y.Z`, the release workflow derives the immutable tag `vX.Y.Z`.
+
+The workflow order is:
+
+1. validate the release candidate,
+2. detect or publish `name@X.Y.Z` on npm,
+3. verify registry metadata and tarball availability,
+4. create immutable `vX.Y.Z`,
+5. create the GitHub Release for the same tag.
+
+The workflow never moves an existing version tag. If the tag already exists at a different commit, the release fails.
+
+This order also permits recovery if npm accepts a publish but a later step fails. A rerun detects the existing npm version, skips republishing the immutable version, and continues with verification and any missing GitHub metadata.
+
+## Official package compatibility operations
+
+Before a release that claims compatibility with a newer current Microsoft package:
+
+1. Download the latest official ZIP separately from the Microsoft Learn page.
+2. Do not add the ZIP or Microsoft SVGs to this repository.
+3. Run:
+
+   ```bash
+   npm run verify:official -- /path/to/latest-official.zip
+   ```
+
+4. Update `COMPATIBILITY.md` only after successful production-parser verification.
+5. Ensure `Release gate: PASS` accurately reflects the current recorded package before release.
+
+The verifier reuses the production `IconPackageSession.open` parser/validator. The official package itself remains outside the repository and npm artifact.
 
 ## Microsoft source-change watcher
 
 `.github/workflows/microsoft-icons-watch.yml` runs weekly and on manual dispatch. It compares the official ZIP identity/link plus normalized fingerprints of the Microsoft Learn `General guidelines` and `Icon terms` sections to the reviewed baseline.
 
 A difference opens or updates a maintenance issue. It never downloads or commits the official ZIP/SVG assets and never changes legal guidance, compatibility claims, or runtime code automatically.
+
+## Historical: v0.1.0 bootstrap
+
+The initial release required a one-time bootstrap because npm Trusted Publishing had to be configured against an existing registry package.
+
+The completed bootstrap sequence was:
+
+1. A disposable worktree changed the package version to `0.0.0` without committing that version to the repository.
+2. `@shimabell06/cloud-arch-icon-browser@0.0.0` was manually published as a public package under the non-default `bootstrap` dist-tag.
+3. npm Trusted Publishing was configured for `ShimaBell0619/cloud-arch-icon-browser` and `release.yml` with direct publish permission.
+4. The `v0.1.0` release-readiness PR was merged.
+5. GitHub Actions published `@shimabell06/cloud-arch-icon-browser@0.1.0` through OIDC with signed provenance.
+6. The immutable `v0.1.0` tag and GitHub Release were created.
+
+The repository never used `0.0.0` as its source-controlled release version. The published `0.0.0` remains historical npm registry metadata.
+
+If the `bootstrap` dist-tag is still present and is no longer useful, a maintainer may remove only the tag:
+
+```bash
+npm dist-tag rm @shimabell06/cloud-arch-icon-browser bootstrap
+```
+
+Do not unpublish the historical version merely to clean up release metadata.
+
+After OIDC publishing has been proven, npm Publishing access should use the strongest practical account/package setting, preferably requiring two-factor authentication while disallowing legacy publish tokens.
