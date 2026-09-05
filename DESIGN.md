@@ -93,7 +93,8 @@ This preview is not a supported distribution channel and must preserve the same 
 - Do not add telemetry, analytics, account state, cloud sync, or runtime package/update APIs.
 - Do not persist file handles or silently reopen a package.
 - The Pages build may use the repository subpath base required by GitHub Pages while the normal npm/npx build keeps the root `/` base.
-- Pull requests should validate the Pages-specific Vite build; deployment occurs only from `main` or an explicit maintainer workflow dispatch.
+- Pull requests validate a target-specific Pages build. Same-repository PRs also publish to stable `/pr-N/` preview paths, while fork PRs remain build-only.
+- `main` publishes at the site root and preserves active `pr-*` previews; closing or merging a PR removes its preview.
 
 The operational setup is documented in `docs/PAGES_PREVIEW.md`.
 
@@ -297,6 +298,8 @@ Reload always returns the application to the package-picker state and requires e
 - User selects a package on every run/session.
 - Reload clears the active package session and returns to the package picker; only the approved UI metadata in §5.3 may persist.
 - Initial selection supports drag/drop and file picker.
+- In secure contexts where `showOpenFilePicker()` is available, package selection may prefer a transient File System Access picker with a ZIP filter; cancellation is silent and unsupported/error cases fall back to the standard file input.
+- A `FileSystemFileHandle` is used only long enough to obtain the current-session `File` and must never be persisted or used to silently reopen a package.
 - After a package is loaded, global drag/drop replacement is disabled.
 - Replacement occurs only through an explicit `Change package` action.
 - A candidate replacement is validated before replacing the active session.
@@ -689,7 +692,7 @@ Linux runs the full suite:
 
 Windows and macOS run packaged CLI smoke validation. CodeQL for JavaScript/TypeScript is enabled.
 
-The Pages preview workflow also validates a Vite build using the repository Pages base path on pull requests. Pages deployment is restricted to `main` or an explicit maintainer workflow dispatch.
+The Pages preview workflow validates target-specific Vite builds. Same-repository PRs publish to stable `/pr-N/` paths for pre-merge device verification; fork PRs are build-only. `main` remains at the site root, and closing or merging a PR removes its generated preview path.
 
 ## 12. Dependency and package policy
 
