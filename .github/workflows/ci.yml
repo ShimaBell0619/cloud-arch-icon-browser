@@ -85,14 +85,14 @@ jobs:
       - if: steps.changes.outputs.code_changed == 'true'
         run: node scripts/cli-server-smoke.mjs
 
-  cli-smoke:
-    name: CLI smoke (${{ matrix.os }})
+  cli-package-smoke:
+    name: Packaged CLI smoke (${{ matrix.os }})
     needs: foundation
     if: needs.foundation.outputs.code_changed == 'true'
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [ubuntu-24.04, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -105,4 +105,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npm run test:cli-smoke
+      - run: npm run test:cli-package-smoke
