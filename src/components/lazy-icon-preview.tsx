@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import { ImageOffIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { IconEntry, IconPackageSession } from "@/core";
 
 interface LazyIconPreviewProps {
@@ -74,7 +74,9 @@ export function LazyIconPreview({
         <img
           src={preview.url}
           alt={`${icon.displayName} preview`}
-          className={large ? "size-32 object-contain" : "size-16 object-contain"}
+          className={
+            large ? "size-32 object-contain" : "size-16 object-contain"
+          }
           draggable={false}
           loading={eager ? "eager" : "lazy"}
         />
