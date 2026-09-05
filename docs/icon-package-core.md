@@ -98,15 +98,23 @@ a general-purpose sanitizer; it may refuse benign uncommon SVG constructs.
 `UNSAFE_PREVIEW` leaves original download bytes available. Image isolation and the
 future server CSP remain necessary parts of the design.
 
-No official Microsoft ZIP was downloaded or measured for this implementation.
-There are no guessed icon/category counts, version gates, naming-match minima,
-ZIP-size ceilings, or compression-ratio limits. Summary counts/matches report the
-input observed, not its authenticity. Size checks reject impossible numeric
-metadata and bound output to the declared entry size; they do not impose an
-absolute memory budget. Large but structurally valid inputs may still consume
-substantial memory. Official-package measurements with headroom and release
-verification remain pending in `COMPATIBILITY.md`; this PR makes no new official
-compatibility claim.
+For implementation-time structural plausibility tuning, the current Microsoft
+page was checked on 2026-09-05 and still points to
+`Azure_Public_Service_Icons_V24.zip`. The V24 browsable corpus was cross-checked as
+624 SVGs using independently documented V24-derived copies. The parser therefore
+uses upper-only limits of 2,048 browsable SVGs and 4,096 total ZIP entries,
+providing approximately 3.3x and 6.6x headroom respectively. The limits reject
+packages that are structurally far outside the supported package shape without
+hard-coding a version filename, category names, a minimum icon count, or a naming
+match rate.
+
+These implementation limits are not a formal compatibility claim. The official
+ZIP is not committed or retained by the project, and the maintainer's direct
+release verification remains pending in `COMPATIBILITY.md`/Issue #5. There is
+still no absolute ZIP-byte ceiling or compression-ratio gate; large entries within
+the structural count limits can consume substantial memory when explicitly
+extracted. Release verification may tighten or relax limits only from measured
+official-package data with documented headroom.
 
 ## Search behavior
 
