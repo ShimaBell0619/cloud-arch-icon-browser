@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from "react";
 import { ChevronRightIcon, FolderIcon, Layers3Icon } from "lucide-react";
+import { useId, useState } from "react";
 import type { IconCategory } from "@/core";
 
 interface CategoryTreeProps {
@@ -16,10 +16,6 @@ export function CategoryTree({
   onSelect,
 }: CategoryTreeProps) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-
-  useEffect(() => {
-    setExpanded(new Set());
-  }, [categories]);
 
   const toggle = (id: string) => {
     setExpanded((current) => {
