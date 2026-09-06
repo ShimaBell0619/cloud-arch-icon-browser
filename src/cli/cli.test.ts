@@ -1,6 +1,7 @@
 /** @vitest-environment node */
 
 import { describe, expect, it, vi } from "vitest";
+import { version as packageVersion } from "../../package.json";
 import {
   attemptBrowserOpen,
   parseCliArguments,
@@ -32,7 +33,7 @@ describe("parseCliArguments", () => {
 
 describe("readPackageVersion", () => {
   it("reads the version from the package manifest", async () => {
-    await expect(readPackageVersion()).resolves.toBe("0.1.0");
+    await expect(readPackageVersion()).resolves.toBe(packageVersion);
   });
 });
 
