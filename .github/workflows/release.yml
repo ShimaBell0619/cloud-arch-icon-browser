@@ -31,11 +31,42 @@ jobs:
         name: Check whether npm publication is activated
         shell: bash
         run: |
+          set -euo pipefail
+
           if [[ "$(node -p "require('./package.json').private === true")" == "true" ]]; then
             echo "activated=false" >> "$GITHUB_OUTPUT"
             echo "Publication is intentionally disabled while package.json has private=true."
+            exit 0
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "activated=true" >> "$GITHUB_OUTPUT"
+            echo "Manual release run requested."
+            exit 0
+          fi
+
+          before="${{ github.event.before }}"
+          if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
+            echo "activated=true" >> "$GITHUB_OUTPUT"
+            echo "Previous commit is unavailable; running release checks conservatively."
+            exit 0
+          fi
+
+          if ! git cat-file -e "${before}:package.json" 2>/dev/null; then
+            echo "activated=true" >> "$GITHUB_OUTPUT"
+            echo "Previous package.json is unavailable; running release checks conservatively."
+            exit 0
+          fi
+
+          previous_version="$(git show "${before}:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")"
+          current_version="$(node -p "require('./package.json').version")"
+
+          if [[ "$previous_version" == "$current_version" ]]; then
+            echo "activated=false" >> "$GITHUB_OUTPUT"
+            echo "Package version is unchanged at $current_version; skipping publication."
           else
             echo "activated=true" >> "$GITHUB_OUTPUT"
+            echo "Package version changed from $previous_version to $current_version; publication is activated."
           fi
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
