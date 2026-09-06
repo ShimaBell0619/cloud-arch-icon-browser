@@ -56,7 +56,8 @@ try {
   const recordingStartedAt = Date.now();
   const page = await context.newPage();
   const video = page.video();
-  if (!video) throw new Error("Playwright video recording was not initialized.");
+  if (!video)
+    throw new Error("Playwright video recording was not initialized.");
 
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await page.getByLabel("Choose icon package ZIP").setInputFiles(zipPath);
@@ -130,7 +131,16 @@ function startDevServer() {
   const npmExecutable = process.platform === "win32" ? "npm.cmd" : "npm";
   return spawn(
     npmExecutable,
-    ["run", "dev", "--", "--host", "127.0.0.1", "--port", "4173", "--strictPort"],
+    [
+      "run",
+      "dev",
+      "--",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "4173",
+      "--strictPort",
+    ],
     {
       stdio: ["ignore", "inherit", "inherit"],
       env: process.env,
@@ -143,7 +153,9 @@ async function waitForServer(url, server) {
 
   while (Date.now() < deadline) {
     if (server.exitCode !== null) {
-      throw new Error(`Vite exited before the demo could be recorded (${server.exitCode}).`);
+      throw new Error(
+        `Vite exited before the demo could be recorded (${server.exitCode}).`,
+      );
     }
 
     try {
