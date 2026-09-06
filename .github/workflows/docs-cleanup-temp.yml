@@ -1,0 +1,174 @@
+name: Temporary docs cleanup
+
+on:
+  push:
+    branches: [docs/cleanup-obsolete]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: docs/cleanup-obsolete
+
+      - name: Apply documentation cleanup
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_required(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"Expected text not found in {path}: {old[:80]!r}")
+              p.write_text(text.replace(old, new))
+
+          # Keep DESIGN.md intact except for references to documents removed here.
+          replace_required(
+              "DESIGN.md",
+              "The operational setup is documented in `docs/PAGES_PREVIEW.md`.",
+              "The operational and visual-review setup is documented in `docs/UI_REVIEW.md`.",
+          )
+          replace_required(
+              "DESIGN.md",
+              "- `docs/RELEASE.md`: release and compatibility operations.\n- `docs/PAGES_PREVIEW.md`: GitHub Pages UI-preview setup and operational boundary.\n- `docs/V0.2.0_VERIFICATION.md`: release-specific `v0.2.0` verification record.\n- `LICENSE`: MIT license for project code.",
+              "- `docs/RELEASE.md`: release and compatibility operations.\n- `docs/UI_REVIEW.md`: browser UI review and GitHub Pages preview operations.\n- `LICENSE`: MIT license for project code.",
+          )
+
+          # The implementation-specific Issue #2 note is obsolete; keep the current
+          # test/coverage guidance in CONTRIBUTING without linking to it.
+          replace_required(
+              "CONTRIBUTING.md",
+              "Core fixtures are generated in memory from project-owned shapes; do not replace them with Microsoft assets. See the [core integration notes](./docs/icon-package-core.md).",
+              "Core fixtures are generated in memory from project-owned shapes; do not replace them with Microsoft assets.",
+          )
+
+          # Remove the stale v0.2.0 release-record dependency while preserving the
+          # general rule that release-specific acceptance gates still matter.
+          release_path = Path("docs/RELEASE.md")
+          release = release_path.read_text()
+          release, count = re.subn(
+              r"\nRelease-specific verification records may live under `docs/`; the `v0\.2\.0` record is \[`V0\.2\.0_VERIFICATION\.md`\]\(\./V0\.2\.0_VERIFICATION\.md\)\.\n\n## Normal release flow",
+              "\n## Normal release flow",
+              release,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not remove v0.2.0 verification-record reference from docs/RELEASE.md")
+
+          release_section = """## Release-specific product gates
+
+A Changesets Release PR is not sufficient evidence by itself that a feature release is ready. When an Epic or release-polish Issue defines additional acceptance criteria, complete those gates before merging the release PR. Keep release-specific evidence in the relevant Issue, PR, or release notes rather than a permanent version-specific runbook under `docs/`.
+
+The repository-wide rule remains: release PR merge requires explicit maintainer instruction; do not enable or perform automatic merge merely because CI is green.
+
+## Trusted Publishing contract"""
+          release, count = re.subn(
+              r"## Release-specific product gates\n\n.*?\n\n## Trusted Publishing contract",
+              release_section,
+              release,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit("Could not normalize release-specific product gates in docs/RELEASE.md")
+          release_path.write_text(release)
+
+          ui_review = """# UI review and Pages preview
+
+This document defines maintainer-facing browser UI review and GitHub Pages preview workflows. Both are development infrastructure; neither changes the local-only product/runtime contract in `DESIGN.md`.
+
+## Automated browser review
+
+Browser UI changes use Playwright with project-owned synthetic ZIP/SVG fixtures. Microsoft Azure Architecture Icon ZIPs/SVGs must never be committed, used as test baselines, or uploaded as workflow artifacts.
+
+`.github/workflows/ui-review.yml` runs for browser-UI-affecting pull requests and can also be started manually for a branch, tag, or commit SHA. It starts the real Vite app, loads the synthetic ZIP through the browser, captures screenshots, and uploads them as a 14-day Actions artifact.
+
+The capture set is intentionally stable:
+
+| Capture | Viewport / mode |
+| --- | --- |
+| `01-unloaded-desktop.png` | 1440 × 1000, light |
+| `02-loaded-desktop.png` | 1440 × 1000, light |
+| `03-details-dialog-desktop.png` | 1440 × 1000, light |
+| `04-loaded-mobile.png` | 390 × 844, light |
+| `05-categories-mobile.png` | 390 × 844, light |
+| `06-loaded-desktop-dark.png` | 1440 × 1000, dark |
+
+Normal CI separately runs the Playwright golden path, automated WCAG A/AA checks through axe, and the committed visual-regression baselines. Update committed Playwright screenshots with `npm run test:e2e:update` only after confirming that a visual change is intentional.
+
+When reviewing a UI PR, inspect the actual screenshots rather than inferring visual correctness from source code or unit tests alone.
+
+## GitHub Pages preview
+
+GitHub Pages is an optional interactive review surface for phones, tablets, and other browsers. It is not a supported distribution channel; npm/npx remains the supported product distribution.
+
+### Automatic main and PR previews
+
+`.github/workflows/pages.yml` maintains the normal preview site:
+
+- `main` publishes to `https://shimabell0619.github.io/cloud-arch-icon-browser/`.
+- Same-repository PR `#N` publishes to `https://shimabell0619.github.io/cloud-arch-icon-browser/pr-N/`.
+- Fork PRs are build-validated but are not published because untrusted fork code must not receive write-capable repository or Pages credentials.
+- Closing or merging a same-repository PR removes its `pr-N` preview.
+
+The workflow stores generated site content on the automation-owned `pages-content` branch so `main` and active PR previews can coexist. Do not edit that branch manually. Main publication uses the `github-pages` environment; same-repository PR publish/cleanup uses `github-pages-preview`.
+
+Pages builds use target-specific Vite bases: `/cloud-arch-icon-browser/` for `main` and `/cloud-arch-icon-browser/pr-N/` for PR previews. The normal npm/npx build continues to use `/`.
+
+### Manual selected-ref preview
+
+`.github/workflows/pages-preview.yml` (`Publish Pages Preview`) can publish an explicitly selected branch, tag, or commit SHA for ad-hoc interactive review. This deploys the selected ref as the main Pages site, so use it only when intentionally replacing the current root preview.
+
+### One-time repository setup
+
+GitHub Pages must use GitHub Actions as its source:
+
+1. Open **Settings → Pages**.
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+
+## Security and asset boundary
+
+All preview paths preserve the same product boundaries:
+
+- deploy only repository-owned built application assets,
+- never publish or persist Microsoft ZIP/SVG assets,
+- process a user-selected ZIP only in the current browser session,
+- do not upload selected ZIP/SVG content to GitHub or another backend,
+- do not add telemetry, analytics, account state, cloud sync, or runtime package/update APIs,
+- do not persist file handles or silently reopen a package.
+
+The application may use the browser File System Access picker transiently when available, but the resulting handle is not persisted. Unsupported browsers and picker failures fall back to the normal ZIP file input.
+
+## Maintenance
+
+Keep screenshot names and viewports stable unless the review policy intentionally changes. If navigation, accessibility names, or review flows change, update the relevant Playwright/UI-review scripts in the same PR so failures remain meaningful rather than being silently skipped.
+"""
+          Path("docs/UI_REVIEW.md").write_text(ui_review)
+
+          for obsolete in (
+              "docs/PAGES_PREVIEW.md",
+              "docs/V0.2.0_VERIFICATION.md",
+              "docs/icon-package-core.md",
+          ):
+              Path(obsolete).unlink()
+          PY
+
+      - name: Commit generated cleanup
+        shell: bash
+        run: |
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "No cleanup changes remain."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "docs: remove obsolete documentation"
+          git push origin HEAD:docs/cleanup-obsolete
