@@ -18,10 +18,10 @@ import {
   recordRecentSearch,
   removeFavorite,
   resolveSavedSet,
+  type StorageLike,
   savePersistedState,
   serializeSavedSet,
   setPersistedPreferences,
-  type StorageLike,
   updateSavedSet,
 } from "./persistence";
 import type { IconEntry } from "./types";
@@ -202,7 +202,8 @@ describe("persistence", () => {
       state.recentIcons.filter((recent) => recent.displayName === "Service 10"),
     ).toHaveLength(1);
     expect(
-      state.iconUsage.find((usage) => usage.displayName === "Service 10")?.count,
+      state.iconUsage.find((usage) => usage.displayName === "Service 10")
+        ?.count,
     ).toBe(3);
   });
 
@@ -261,7 +262,10 @@ describe("persistence", () => {
     expect(state.savedSets[0]?.name).toBe("Updated");
     expect(state.savedSets[0]?.items[0]?.quantity).toBe(3);
 
-    const serialized = serializeSavedSet(state.savedSets[0]!);
+    const updatedSet = state.savedSets[0];
+    expect(updatedSet).toBeDefined();
+    if (!updatedSet) throw new Error("Expected updated Saved Set.");
+    const serialized = serializeSavedSet(updatedSet);
     expect(parseSavedSetShare(serialized)?.name).toBe("Updated");
     const imported = importSavedSet(state, serialized, {
       id: "set-2",
@@ -269,8 +273,9 @@ describe("persistence", () => {
     });
     expect(imported?.savedSets[0]?.id).toBe("set-2");
     expect(importSavedSet(state, "not json")).toBeNull();
+    if (!imported) throw new Error("Expected imported Saved Set state.");
 
-    state = deleteSavedSet(imported!, "set-1");
+    state = deleteSavedSet(imported, "set-1");
     expect(state.savedSets.some((set) => set.id === "set-1")).toBe(false);
   });
 
@@ -296,7 +301,10 @@ describe("persistence", () => {
       categoryPath: "New",
     };
 
-    const resolved = resolveSavedSet(state.savedSets[0]!, [moved]);
+    const savedSet = state.savedSets[0];
+    expect(savedSet).toBeDefined();
+    if (!savedSet) throw new Error("Expected Saved Set to resolve.");
+    const resolved = resolveSavedSet(savedSet, [moved]);
     expect(resolved.matchedItems).toHaveLength(1);
     expect(resolved.matchedItems[0]?.item.quantity).toBe(2);
     expect(resolved.unresolvedItems).toHaveLength(1);
@@ -309,12 +317,10 @@ describe("persistence", () => {
     state = addFavorite(state, old, 10);
     state = addFavorite(state, missing, 20);
     state = recordIconUsage(state, old, 30);
-    state = createSavedSet(
-      state,
-      "Old set",
-      [{ icon: old, quantity: 2 }],
-      { id: "set-old", now: 40 },
-    );
+    state = createSavedSet(state, "Old set", [{ icon: old, quantity: 2 }], {
+      id: "set-old",
+      now: 40,
+    });
 
     const moved: IconEntry = {
       ...old,
