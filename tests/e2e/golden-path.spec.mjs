@@ -168,7 +168,9 @@ test("favorites, recent icons, recent searches, and compact view survive package
     page.getByRole("button", { name: "Compact view" }),
   ).toHaveAttribute("aria-pressed", "true");
 
-  const reloadedNavigation = page.getByRole("navigation", { name: "Workspace" });
+  const reloadedNavigation = page.getByRole("navigation", {
+    name: "Workspace",
+  });
   await reloadedNavigation.getByRole("button", { name: "Favorites" }).click();
   await expect(
     page.getByRole("button", { name: "Open App Service details, Compute" }),

@@ -23,6 +23,7 @@ interface SearchAutocompleteProps {
   session: IconPackageSession;
   items: readonly SearchAutocompleteItem[];
   activeIndex: number;
+  categoryFilterActive?: boolean;
   onSelect: (item: SearchAutocompleteItem) => void;
 }
 
@@ -32,12 +33,15 @@ export function SearchAutocomplete({
   session,
   items,
   activeIndex,
+  categoryFilterActive = false,
   onSelect,
 }: SearchAutocompleteProps) {
   if (!open || items.length === 0) return null;
 
   return (
-    <div className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-50 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg">
+    <div
+      className={`absolute left-0 right-0 z-50 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg ${categoryFilterActive ? "top-[calc(100%+3.3rem)]" : "top-[calc(100%+0.45rem)]"}`}
+    >
       <div id={id} className="max-h-[min(26rem,55svh)] overflow-y-auto p-1.5">
         {items.map((item, index) => {
           const active = index === activeIndex;

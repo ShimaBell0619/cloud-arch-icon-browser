@@ -805,6 +805,7 @@ function LoadedWorkspace({
                 session={session}
                 items={autocompleteItems}
                 activeIndex={activeAutocompleteIndex}
+                categoryFilterActive={selectedCategory !== null}
                 onSelect={selectAutocompleteItem}
               />
             </div>
