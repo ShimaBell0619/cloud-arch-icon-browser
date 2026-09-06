@@ -1,6 +1,6 @@
 # Cloud Arch Icon Browser
 
-Find Microsoft Azure Architecture Icons quickly and copy them into PowerPoint, Excel, or other compatible apps.
+Find Microsoft Azure Architecture Icons quickly, collect the ones you need, and copy them into PowerPoint, Excel, or other compatible apps.
 
 ![Cloud Arch Icon Browser demo](./docs/assets/demo.gif)
 
@@ -25,7 +25,7 @@ On browsers that support the File System Access API, a successfully validated se
 
 - Fast search across icon names, original filenames, and category paths.
 - Category browsing with explicit search filter chips.
-- Favorites, recently used icons, recent searches, Frequently used shortcuts, Tray, Saved Sets, and Grid / Compact views.
+- Favorites, recently used icons, recent searches, Frequently used shortcuts, a session Tray with order/quantity controls, reusable Saved Sets, and Grid / Compact views.
 - Centered icon details with real package metadata.
 - Copy icons as transparent 512×512 PNG images for compatible clipboard workflows such as Windows PowerPoint and Excel.
 - Copy original SVG source text where supported or download the original SVG with its original filename.
