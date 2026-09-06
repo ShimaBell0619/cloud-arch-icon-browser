@@ -7,6 +7,7 @@ import {
   FolderArchiveIcon,
   FolderTreeIcon,
   LayoutGridIcon,
+  ListChecksIcon,
   LoaderCircleIcon,
   MenuIcon,
   MonitorIcon,
@@ -16,6 +17,7 @@ import {
   RefreshCwIcon,
   Rows3Icon,
   SearchIcon,
+  ShoppingBasketIcon,
   StarIcon,
   SunIcon,
   UploadIcon,
@@ -36,30 +38,48 @@ import {
 } from "react";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
 import { CategoryTree } from "@/components/category-tree";
-import { IconCard } from "@/components/icon-card";
+import { ICON_DRAG_MIME, IconCard } from "@/components/icon-card";
 import { IconDetailsDialog } from "@/components/icon-details-dialog";
 import {
   SearchAutocomplete,
   type SearchAutocompleteItem,
 } from "@/components/search-autocomplete";
+import { TrayWorkspace } from "@/components/tray-workspace";
 import { Button } from "@/components/ui/button";
 import {
   addFavorite,
+  addIconsToTray,
+  addIconToTray,
   createDefaultPersistedState,
+  createSavedSet,
+  deleteSavedSet,
+  getFrequentlyUsedIcons,
+  importSavedSet,
   type IconCategory,
   type IconEntry,
   IconPackageSession,
   loadPersistedState,
+  moveTrayItem,
   type PackageProblem,
+  parseSavedSetShare,
   type PersistedPreferences,
   type PersistedState,
   reconcilePersistedStateWithIcons,
-  recordRecentIcon,
+  reconcileTrayWithIcons,
+  recordIconUsage,
   recordRecentSearch,
   removeFavorite,
+  removeTrayItem,
+  resolveSavedSet,
   savePersistedState,
+  type SavedSetRecord,
+  serializeSavedSet,
   setPersistedPreferences,
+  setTrayItemQuantity,
   type ThemePreference,
+  type TrayItem,
+  trayTotalQuantity,
+  updateSavedSet,
 } from "@/core";
 import { clipboardErrorMessage, copyIconAsPng } from "@/lib/icon-clipboard";
 import { choosePackageFile } from "@/lib/package-file-picker";
@@ -69,9 +89,13 @@ const PACKAGE_ACCEPT = ".zip,application/zip,application/x-zip-compressed";
 const SEARCH_DEBOUNCE_MS = 175;
 
 type LoadPhase = "reading" | "validating" | "indexing";
-type WorkspaceView = "all" | "favorites" | "recent";
+type WorkspaceView = "all" | "favorites" | "recent" | "tray";
 type PersistedStateUpdater = (
   updater: (state: PersistedState) => PersistedState,
+) => void;
+
+type TrayItemsUpdater = (
+  updater: (items: readonly TrayItem[]) => readonly TrayItem[],
 ) => void;
 
 interface LoadedPackage {
@@ -98,6 +122,10 @@ export function App() {
   const [persistedState, setPersistedState] = useState(
     readInitialPersistedState,
   );
+  const [trayItems, setTrayItems] = useState<readonly TrayItem[]>([]);
+  const [trayReconcileNotice, setTrayReconcileNotice] = useState<string | null>(
+    null,
+  );
 
   useAppliedTheme(persistedState.preferences.theme);
 
@@ -121,6 +149,10 @@ export function App() {
     });
   }, []);
 
+  const updateTrayItems = useCallback<TrayItemsUpdater>((updater) => {
+    setTrayItems((current) => updater(current));
+  }, []);
+
   const updatePreferences = useCallback(
     (preferences: Partial<PersistedPreferences>) => {
       updatePersistedState((current) =>
@@ -137,6 +169,8 @@ export function App() {
     setLoadedPackage(null);
     setLoadPhase(null);
     setLoadError(null);
+    setTrayItems([]);
+    setTrayReconcileNotice(null);
     disposeQuietly(active);
   }, []);
 
@@ -170,6 +204,18 @@ export function App() {
 
     const previous = activeSessionRef.current;
     activeSessionRef.current = candidate.session;
+    setTrayItems((current) => {
+      const reconciled = reconcileTrayWithIcons(
+        current,
+        candidate.session.metadata.icons,
+      );
+      setTrayReconcileNotice(
+        reconciled.unmatched.length
+          ? `${reconciled.unmatched.length} Tray item${reconciled.unmatched.length === 1 ? "" : "s"} could not be matched in the new package.`
+          : null,
+      );
+      return reconciled.items;
+    });
     setLoadedPackage((current) => ({
       session: candidate.session,
       filename: file.name,
@@ -193,8 +239,12 @@ export function App() {
           loadError={loadError}
           persistedState={persistedState}
           preferences={persistedState.preferences}
+          trayItems={trayItems}
+          trayReconcileNotice={trayReconcileNotice}
           onPersistedStateChange={updatePersistedState}
           onPreferencesChange={updatePreferences}
+          onTrayItemsChange={updateTrayItems}
+          onDismissTrayReconcileNotice={() => setTrayReconcileNotice(null)}
           onReplace={(file) => void loadPackage(file)}
         />
       ) : (
@@ -379,8 +429,12 @@ interface LoadedWorkspaceProps {
   loadError: PackageProblem | null;
   persistedState: PersistedState;
   preferences: PersistedPreferences;
+  trayItems: readonly TrayItem[];
+  trayReconcileNotice: string | null;
   onPersistedStateChange: PersistedStateUpdater;
   onPreferencesChange: (preferences: Partial<PersistedPreferences>) => void;
+  onTrayItemsChange: TrayItemsUpdater;
+  onDismissTrayReconcileNotice: () => void;
   onReplace: (file: File) => void;
 }
 
@@ -390,8 +444,12 @@ function LoadedWorkspace({
   loadError,
   persistedState,
   preferences,
+  trayItems,
+  trayReconcileNotice,
   onPersistedStateChange,
   onPreferencesChange,
+  onTrayItemsChange,
+  onDismissTrayReconcileNotice,
   onReplace,
 }: LoadedWorkspaceProps) {
   const { session, filename } = loadedPackage;
@@ -414,6 +472,8 @@ function LoadedWorkspace({
   const [dropNotice, setDropNotice] = useState<string | null>(null);
   const [autocompleteOpen, setAutocompleteOpen] = useState(false);
   const [activeAutocompleteIndex, setActiveAutocompleteIndex] = useState(-1);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [copyNotice, setCopyNotice] = useState<{
     readonly kind: "success" | "error";
     readonly message: string;
@@ -440,6 +500,10 @@ function LoadedWorkspace({
   const recentIcons = useMemo(
     () => reconciliation.matchedRecentIcons.map(({ icon }) => icon),
     [reconciliation.matchedRecentIcons],
+  );
+  const frequentlyUsedIcons = useMemo(
+    () => getFrequentlyUsedIcons(persistedState, icons, 6),
+    [icons, persistedState],
   );
 
   const results = useMemo(
@@ -483,6 +547,7 @@ function LoadedWorkspace({
   const visibleIcons = useMemo(() => {
     if (workspaceView === "favorites") return favoriteIcons;
     if (workspaceView === "recent") return recentIcons;
+    if (workspaceView === "tray") return [];
     return results.map(({ icon }) => icon);
   }, [favoriteIcons, recentIcons, results, workspaceView]);
 
@@ -493,6 +558,11 @@ function LoadedWorkspace({
       }
     };
   }, []);
+
+  useEffect(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, [debouncedQuery, selectedCategory, workspaceView]);
 
   useEffect(() => {
     const handleSlash = (event: KeyboardEvent) => {
@@ -573,6 +643,13 @@ function LoadedWorkspace({
     setAutocompleteOpen(false);
   };
 
+  const showTray = () => {
+    setWorkspaceView("tray");
+    setSelectedCategory(null);
+    setQuery("");
+    setAutocompleteOpen(false);
+  };
+
   const selectCategory = (categoryId: string | null) => {
     setWorkspaceView("all");
     setSelectedCategory(categoryId);
@@ -598,7 +675,6 @@ function LoadedWorkspace({
   const openDetails = (icon: IconEntry, trigger: HTMLElement | null) => {
     setDetailsTrigger(trigger);
     setSelectedIcon(icon);
-    onPersistedStateChange((state) => recordRecentIcon(state, icon));
   };
 
   const toggleFavorite = (icon: IconEntry) => {
@@ -607,6 +683,37 @@ function LoadedWorkspace({
         ? removeFavorite(state, icon)
         : addFavorite(state, icon),
     );
+  };
+
+  const recordUsage = useCallback(
+    (icon: IconEntry) => {
+      onPersistedStateChange((state) => recordIconUsage(state, icon));
+    },
+    [onPersistedStateChange],
+  );
+
+  const addToTray = useCallback(
+    (icon: IconEntry, quantity = 1) => {
+      onTrayItemsChange((current) => addIconToTray(current, icon, quantity));
+      recordUsage(icon);
+      setDropNotice(`Added ${icon.displayName} to Tray.`);
+    },
+    [onTrayItemsChange, recordUsage],
+  );
+
+  const addSelectedToTray = () => {
+    const selected = visibleIcons.filter((icon) => selectedIds.has(icon.id));
+    if (!selected.length) return;
+    onTrayItemsChange((current) => addIconsToTray(current, selected));
+    onPersistedStateChange((state) =>
+      selected.reduce(
+        (current, icon) => recordIconUsage(current, icon),
+        state,
+      ),
+    );
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+    setDropNotice(`Added ${selected.length} icons to Tray.`);
   };
 
   const showCopyFeedback = useCallback(
@@ -629,6 +736,7 @@ function LoadedWorkspace({
   const copyQuick = async (icon: IconEntry) => {
     try {
       await copyIconAsPng(session, icon);
+      recordUsage(icon);
       showCopyFeedback({
         kind: "success",
         message: `Copied ${icon.displayName} as a 512×512 PNG.`,
@@ -695,7 +803,81 @@ function LoadedWorkspace({
     }
   };
 
-  const statusText = `${visibleIcons.length} ${visibleIcons.length === 1 ? "icon" : "icons"}`;
+  const loadSavedSet = (set: SavedSetRecord, mode: "add" | "replace") => {
+    const resolved = resolveSavedSet(set, icons);
+    onTrayItemsChange((current) => {
+      let next: readonly TrayItem[] = mode === "replace" ? [] : current;
+      for (const item of resolved.matchedItems) {
+        next = addIconToTray(next, item.icon, item.item.quantity);
+      }
+      return next;
+    });
+    setDropNotice(
+      resolved.unresolvedItems.length
+        ? `Loaded ${resolved.matchedItems.length} Saved Set items; ${resolved.unresolvedItems.length} could not be matched.`
+        : `Loaded ${set.name} into Tray.`,
+    );
+  };
+
+  const saveTrayAsSet = (name: string): boolean => {
+    if (!name.trim() || trayItems.length === 0) return false;
+    onPersistedStateChange((state) =>
+      createSavedSet(
+        state,
+        name,
+        trayItems.map((item) => ({
+          icon: item.icon,
+          quantity: item.quantity,
+        })),
+      ),
+    );
+    return true;
+  };
+
+  const updateSetFromTray = (set: SavedSetRecord) => {
+    if (!trayItems.length) return;
+    onPersistedStateChange((state) =>
+      updateSavedSet(
+        state,
+        set.id,
+        set.name,
+        trayItems.map((item) => ({
+          icon: item.icon,
+          quantity: item.quantity,
+        })),
+      ),
+    );
+    setDropNotice(`Updated ${set.name} from the current Tray.`);
+  };
+
+  const copySavedSet = async (set: SavedSetRecord): Promise<boolean> => {
+    if (typeof navigator.clipboard?.writeText !== "function") return false;
+    try {
+      await navigator.clipboard.writeText(serializeSavedSet(set));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const importSavedSetFromText = (raw: string): boolean => {
+    if (!parseSavedSetShare(raw)) return false;
+    onPersistedStateChange((state) => importSavedSet(state, raw) ?? state);
+    return true;
+  };
+
+  const handleTrayDrop = (event: DragEvent<HTMLElement>) => {
+    const iconId = event.dataTransfer.getData(ICON_DRAG_MIME);
+    if (!iconId) return;
+    event.preventDefault();
+    const icon = icons.find((candidate) => candidate.id === iconId);
+    if (icon) addToTray(icon);
+  };
+
+  const statusText =
+    workspaceView === "tray"
+      ? `${trayTotalQuantity(trayItems)} Tray objects`
+      : `${visibleIcons.length} ${visibleIcons.length === 1 ? "icon" : "icons"}`;
   const emptyCollection =
     workspaceView === "favorites"
       ? {
@@ -704,8 +886,13 @@ function LoadedWorkspace({
         }
       : {
           title: "No recent icons yet",
-          body: "Icons you open are kept here locally for quick access.",
+          body: "Icons you Copy or add to Tray are kept here locally for quick access.",
         };
+  const showFrequentlyUsed =
+    workspaceView === "all" &&
+    !query.trim() &&
+    selectedCategory === null &&
+    frequentlyUsedIcons.length > 0;
 
   return (
     <div className="min-h-svh bg-background">
@@ -729,9 +916,11 @@ function LoadedWorkspace({
         collapsed={preferences.sidebarCollapsed}
         theme={preferences.theme}
         loadPhase={loadPhase}
+        trayCount={trayTotalQuantity(trayItems)}
         onShowAll={showAllIcons}
         onShowFavorites={showFavorites}
         onShowRecent={showRecent}
+        onShowTray={showTray}
         onSelectCategory={selectCategory}
         onToggleCategories={toggleCategories}
         onToggleCollapsed={() =>
@@ -818,6 +1007,40 @@ function LoadedWorkspace({
               {statusText}
             </span>
 
+            {workspaceView !== "tray" ? (
+              <Button
+                type="button"
+                variant={selectionMode ? "default" : "outline"}
+                size="sm"
+                aria-pressed={selectionMode}
+                onClick={() => {
+                  setSelectionMode((current) => !current);
+                  setSelectedIds(new Set());
+                }}
+              >
+                <ListChecksIcon aria-hidden="true" data-icon="inline-start" />
+                {selectionMode ? "Cancel" : "Select"}
+              </Button>
+            ) : null}
+
+            <Button
+              type="button"
+              variant={workspaceView === "tray" ? "default" : "outline"}
+              size="sm"
+              aria-label={`Open Tray, ${trayTotalQuantity(trayItems)} objects`}
+              onClick={showTray}
+              onDragOver={(event) => {
+                if (event.dataTransfer.types.includes(ICON_DRAG_MIME)) {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "copy";
+                }
+              }}
+              onDrop={handleTrayDrop}
+            >
+              <ShoppingBasketIcon aria-hidden="true" data-icon="inline-start" />
+              Tray {trayTotalQuantity(trayItems)}
+            </Button>
+
             <fieldset className="flex shrink-0 items-center rounded-xl border border-border bg-card p-1">
               <legend className="sr-only">Icon view</legend>
               <button
@@ -843,7 +1066,21 @@ function LoadedWorkspace({
             </fieldset>
           </div>
 
-          {selectedCategory && selectedCategoryPath ? (
+          {selectionMode ? (
+            <div className="flex items-center justify-between gap-3 border-t border-border/70 px-3 py-2 sm:px-4 lg:px-5">
+              <span className="text-xs text-muted-foreground">
+                {selectedIds.size} selected
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                disabled={selectedIds.size === 0}
+                onClick={addSelectedToTray}
+              >
+                Add {selectedIds.size} to Tray
+              </Button>
+            </div>
+          ) : selectedCategory && selectedCategoryPath ? (
             <div className="flex items-center gap-2 border-t border-border/70 px-3 py-2 sm:px-4 lg:px-5">
               <span className="text-xs text-muted-foreground">
                 Active filter
@@ -867,71 +1104,143 @@ function LoadedWorkspace({
           {loadError ? (
             <PackageErrorNotice problem={loadError} compact />
           ) : null}
+          {trayReconcileNotice ? (
+            <Notice
+              message={trayReconcileNotice}
+              onDismiss={onDismissTrayReconcileNotice}
+            />
+          ) : null}
           {dropNotice ? (
-            <div
-              role="status"
-              className="mb-3 flex items-start gap-2 rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground"
-            >
-              <AlertCircleIcon
-                aria-hidden="true"
-                className="mt-0.5 size-4 shrink-0"
-              />
-              <span>{dropNotice}</span>
-              <button
-                type="button"
-                aria-label="Dismiss package drop message"
-                className="ml-auto rounded-md p-0.5 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
-                onClick={() => setDropNotice(null)}
-              >
-                <XIcon aria-hidden="true" className="size-3.5" />
-              </button>
-            </div>
+            <Notice message={dropNotice} onDismiss={() => setDropNotice(null)} />
           ) : null}
 
-          {visibleIcons.length ? (
-            <section
-              aria-label={
-                workspaceView === "all"
-                  ? "Icon results"
-                  : workspaceView === "favorites"
-                    ? "Favorite icons"
-                    : "Recent icons"
+          {workspaceView === "tray" ? (
+            <TrayWorkspace
+              session={session}
+              items={trayItems}
+              savedSets={persistedState.savedSets}
+              onSetQuantity={(item, quantity) =>
+                onTrayItemsChange((current) =>
+                  setTrayItemQuantity(
+                    current,
+                    item.reference.canonicalPath,
+                    quantity,
+                  ),
+                )
               }
-            >
-              <div
-                className={
-                  preferences.view === "grid"
-                    ? "grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3"
-                    : "grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2"
-                }
-              >
-                {visibleIcons.map((icon) => (
-                  <IconCard
-                    key={icon.id}
-                    session={session}
-                    icon={icon}
-                    view={preferences.view}
-                    favorite={favoriteIds.has(icon.id)}
-                    onOpen={(trigger) => openDetails(icon, trigger)}
-                    onToggleFavorite={() => toggleFavorite(icon)}
-                    onCopy={() => void copyQuick(icon)}
-                  />
-                ))}
-              </div>
-            </section>
-          ) : workspaceView === "all" ? (
-            <EmptyResults
-              query={query}
-              selectedCategory={selectedCategory}
-              onClearSearch={clearSearch}
-              onSearchAll={showAllIcons}
+              onRemove={(item) =>
+                onTrayItemsChange((current) =>
+                  removeTrayItem(current, item.reference.canonicalPath),
+                )
+              }
+              onMove={(item, direction) =>
+                onTrayItemsChange((current) =>
+                  moveTrayItem(
+                    current,
+                    item.reference.canonicalPath,
+                    direction,
+                  ),
+                )
+              }
+              onClear={() => onTrayItemsChange(() => [])}
+              onSaveAsSet={saveTrayAsSet}
+              onUpdateSetFromTray={updateSetFromTray}
+              onDeleteSet={(set) =>
+                onPersistedStateChange((state) =>
+                  deleteSavedSet(state, set.id),
+                )
+              }
+              onLoadSet={loadSavedSet}
+              onCopySet={copySavedSet}
+              onImportSet={importSavedSetFromText}
             />
           ) : (
-            <EmptyCollection
-              icon={workspaceView === "favorites" ? "favorites" : "recent"}
-              title={emptyCollection.title}
-              body={emptyCollection.body}
-            />
+            <>
+              {showFrequentlyUsed ? (
+                <section aria-labelledby="frequently-used-heading" className="mb-5">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div>
+                      <h2
+                        id="frequently-used-heading"
+                        className="text-sm font-semibold"
+                      >
+                        Frequently used
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        Based on local Copy and Tray usage only.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2">
+                    {frequentlyUsedIcons.map((icon) => (
+                      <IconCard
+                        key={`frequent-${icon.id}`}
+                        session={session}
+                        icon={icon}
+                        view="compact"
+                        favorite={favoriteIds.has(icon.id)}
+                        onOpen={(trigger) => openDetails(icon, trigger)}
+                        onToggleFavorite={() => toggleFavorite(icon)}
+                        onCopy={() => void copyQuick(icon)}
+                        onAddToTray={() => addToTray(icon)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {visibleIcons.length ? (
+                <section
+                  aria-label={
+                    workspaceView === "all"
+                      ? "Icon results"
+                      : workspaceView === "favorites"
+                        ? "Favorite icons"
+                        : "Recent icons"
+                  }
+                >
+                  <div
+                    className={
+                      preferences.view === "grid"
+                        ? "grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3"
+                        : "grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2"
+                    }
+                  >
+                    {visibleIcons.map((icon) => (
+                      <IconCard
+                        key={icon.id}
+                        session={session}
+                        icon={icon}
+                        view={preferences.view}
+                        favorite={favoriteIds.has(icon.id)}
+                        selectionMode={selectionMode}
+                        selected={selectedIds.has(icon.id)}
+                        onOpen={(trigger) => openDetails(icon, trigger)}
+                        onToggleFavorite={() => toggleFavorite(icon)}
+                        onCopy={() => void copyQuick(icon)}
+                        onAddToTray={() => addToTray(icon)}
+                        onToggleSelected={() =>
+                          setSelectedIds((current) => toggleSetValue(current, icon.id))
+                        }
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : workspaceView === "all" ? (
+                <EmptyResults
+                  query={query}
+                  selectedCategory={selectedCategory}
+                  onClearSearch={clearSearch}
+                  onSearchAll={showAllIcons}
+                />
+              ) : (
+                <EmptyCollection
+                  icon={workspaceView === "favorites" ? "favorites" : "recent"}
+                  title={emptyCollection.title}
+                  body={emptyCollection.body}
+                />
+              )}
+            </>
           )}
         </main>
       </div>
@@ -947,9 +1256,11 @@ function LoadedWorkspace({
         selectedCategory={selectedCategory}
         theme={preferences.theme}
         loadPhase={loadPhase}
+        trayCount={trayTotalQuantity(trayItems)}
         onShowAll={showAllIcons}
         onShowFavorites={showFavorites}
         onShowRecent={showRecent}
+        onShowTray={showTray}
         onSelectCategory={selectCategory}
         onThemeChange={(theme) => onPreferencesChange({ theme })}
         onChangePackage={chooseReplacement}
@@ -964,6 +1275,8 @@ function LoadedWorkspace({
         onToggleFavorite={() => {
           if (selectedIcon) toggleFavorite(selectedIcon);
         }}
+        onAddToTray={addToTray}
+        onUsed={recordUsage}
         onClose={() => setSelectedIcon(null)}
       />
 
@@ -990,9 +1303,11 @@ interface DesktopSidebarProps {
   collapsed: boolean;
   theme: ThemePreference;
   loadPhase: LoadPhase | null;
+  trayCount: number;
   onShowAll: () => void;
   onShowFavorites: () => void;
   onShowRecent: () => void;
+  onShowTray: () => void;
   onSelectCategory: (categoryId: string | null) => void;
   onToggleCategories: () => void;
   onToggleCollapsed: () => void;
@@ -1011,9 +1326,11 @@ function DesktopSidebar({
   collapsed,
   theme,
   loadPhase,
+  trayCount,
   onShowAll,
   onShowFavorites,
   onShowRecent,
+  onShowTray,
   onSelectCategory,
   onToggleCategories,
   onToggleCollapsed,
@@ -1063,9 +1380,11 @@ function DesktopSidebar({
           selectedCategory={selectedCategory}
           categoriesExpanded={categoriesExpanded}
           collapsed={collapsed}
+          trayCount={trayCount}
           onShowAll={onShowAll}
           onShowFavorites={onShowFavorites}
           onShowRecent={onShowRecent}
+          onShowTray={onShowTray}
           onSelectCategory={onSelectCategory}
           onToggleCategories={onToggleCategories}
         />
@@ -1133,9 +1452,11 @@ interface WorkspaceNavigationProps {
   selectedCategory: string | null;
   categoriesExpanded: boolean;
   collapsed: boolean;
+  trayCount: number;
   onShowAll: () => void;
   onShowFavorites: () => void;
   onShowRecent: () => void;
+  onShowTray: () => void;
   onSelectCategory: (categoryId: string | null) => void;
   onToggleCategories: () => void;
   onNavigate?: () => void;
@@ -1149,9 +1470,11 @@ function WorkspaceNavigation({
   selectedCategory,
   categoriesExpanded,
   collapsed,
+  trayCount,
   onShowAll,
   onShowFavorites,
   onShowRecent,
+  onShowTray,
   onSelectCategory,
   onToggleCategories,
   onNavigate,
@@ -1185,6 +1508,14 @@ function WorkspaceNavigation({
           active={workspaceView === "recent"}
           collapsed={collapsed}
           onClick={() => navigate(onShowRecent)}
+        />
+        <WorkspaceNavButton
+          label="Tray"
+          icon={<ShoppingBasketIcon aria-hidden="true" />}
+          active={workspaceView === "tray"}
+          collapsed={collapsed}
+          trailing={!collapsed ? <span>{trayCount}</span> : undefined}
+          onClick={() => navigate(onShowTray)}
         />
         <WorkspaceNavButton
           label="Categories"
@@ -1277,9 +1608,11 @@ interface NavigationSheetProps {
   selectedCategory: string | null;
   theme: ThemePreference;
   loadPhase: LoadPhase | null;
+  trayCount: number;
   onShowAll: () => void;
   onShowFavorites: () => void;
   onShowRecent: () => void;
+  onShowTray: () => void;
   onSelectCategory: (categoryId: string | null) => void;
   onThemeChange: (theme: ThemePreference) => void;
   onChangePackage: () => void;
@@ -1297,9 +1630,11 @@ function NavigationSheet({
   selectedCategory,
   theme,
   loadPhase,
+  trayCount,
   onShowAll,
   onShowFavorites,
   onShowRecent,
+  onShowTray,
   onSelectCategory,
   onThemeChange,
   onChangePackage,
@@ -1388,9 +1723,11 @@ function NavigationSheet({
             selectedCategory={selectedCategory}
             categoriesExpanded={categoriesExpanded}
             collapsed={false}
+            trayCount={trayCount}
             onShowAll={onShowAll}
             onShowFavorites={onShowFavorites}
             onShowRecent={onShowRecent}
+            onShowTray={onShowTray}
             onSelectCategory={onSelectCategory}
             onToggleCategories={() =>
               setCategoriesExpanded((current) => !current)
@@ -1548,6 +1885,35 @@ function EmptyResults({
   );
 }
 
+function Notice({
+  message,
+  onDismiss,
+}: {
+  message: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      className="mb-3 flex items-start gap-2 rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground"
+    >
+      <AlertCircleIcon
+        aria-hidden="true"
+        className="mt-0.5 size-4 shrink-0"
+      />
+      <span>{message}</span>
+      <button
+        type="button"
+        aria-label="Dismiss message"
+        className="ml-auto rounded-md p-0.5 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
+        onClick={onDismiss}
+      >
+        <XIcon aria-hidden="true" className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function findCategoryPath(
   categories: readonly IconCategory[],
   categoryId: string | null,
@@ -1606,6 +1972,16 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
       <span className="rounded-[2px] bg-background" />
     </div>
   );
+}
+
+function toggleSetValue(
+  current: ReadonlySet<string>,
+  value: string,
+): ReadonlySet<string> {
+  const next = new Set(current);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
 }
 
 function useDebouncedValue(value: string, delayMs: number): string {
