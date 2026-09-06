@@ -44,7 +44,6 @@ export function SearchAutocomplete({
     <div className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-50 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg">
       <div
         id={id}
-        aria-label="Search suggestions"
         className="max-h-[min(26rem,55svh)] overflow-y-auto p-1.5"
       >
         {items.map((item, index) => {
