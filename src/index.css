@@ -114,3 +114,34 @@
     min-width: 320px;
   }
 }
+
+.compact-card-main {
+  padding-right: 3.25rem;
+}
+
+.compact-card-actions .compact-card-secondary-action {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .compact-card-main {
+    padding-right: 0.75rem;
+  }
+
+  .compact-card-actions {
+    pointer-events: none;
+    padding-left: 1.5rem;
+    background: linear-gradient(to right, transparent, var(--card) 1.5rem);
+    opacity: 0;
+  }
+
+  .compact-card-actions .compact-card-secondary-action {
+    display: flex;
+  }
+
+  .group:hover .compact-card-actions,
+  .group:focus-within .compact-card-actions {
+    pointer-events: auto;
+    opacity: 1;
+  }
+}
