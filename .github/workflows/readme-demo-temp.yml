@@ -1,0 +1,53 @@
+name: Generate README demo (temporary)
+
+on:
+  push:
+    branches: [docs/v0.3-readme]
+    paths:
+      - .github/workflows/readme-demo-temp.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Chromium and ffmpeg
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Download official Azure Architecture Icons V24
+        run: |
+          curl --fail --location --retry 3 \
+            https://arch-center.azureedge.net/icons/Azure_Public_Service_Icons_V24.zip \
+            --output /tmp/Azure_Public_Service_Icons_V24.zip
+
+      - name: Generate demo GIF
+        env:
+          AZURE_ICON_ZIP: /tmp/Azure_Public_Service_Icons_V24.zip
+        run: npm run docs:demo
+
+      - name: Commit generated GIF
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/demo.gif
+          if git diff --cached --quiet; then
+            echo "Demo GIF is already up to date."
+            exit 0
+          fi
+          git commit -m "docs: refresh README demo GIF"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
