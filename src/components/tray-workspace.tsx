@@ -11,12 +11,7 @@ import {
 import { useState } from "react";
 import { LazyIconPreview } from "@/components/lazy-icon-preview";
 import { Button } from "@/components/ui/button";
-import type {
-  IconEntry,
-  IconPackageSession,
-  SavedSetRecord,
-  TrayItem,
-} from "@/core";
+import type { IconPackageSession, SavedSetRecord, TrayItem } from "@/core";
 
 interface TrayWorkspaceProps {
   session: IconPackageSession;
@@ -124,7 +119,10 @@ export function TrayWorkspace({
         )}
       </section>
 
-      <section aria-labelledby="save-set-heading" className="rounded-2xl border border-border bg-card p-4">
+      <section
+        aria-labelledby="save-set-heading"
+        className="rounded-2xl border border-border bg-card p-4"
+      >
         <h2 id="save-set-heading" className="text-sm font-semibold">
           Save current Tray
         </h2>
@@ -182,9 +180,16 @@ export function TrayWorkspace({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h3 className="truncate text-sm font-semibold">{set.name}</h3>
+                    <h3 className="truncate text-sm font-semibold">
+                      {set.name}
+                    </h3>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {set.items.length} unique icons · {set.items.reduce((sum, item) => sum + item.quantity, 0)} total
+                      {set.items.length} unique icons ·{" "}
+                      {set.items.reduce(
+                        (sum, item) => sum + item.quantity,
+                        0,
+                      )}{" "}
+                      total
                     </p>
                   </div>
                   <Button
@@ -292,10 +297,8 @@ function TrayRow({
         >
           <MinusIcon aria-hidden="true" />
         </Button>
-        <span
-          aria-label={`${item.icon.displayName} quantity ${item.quantity}`}
-          className="min-w-8 text-center text-sm font-semibold tabular-nums"
-        >
+        <span className="min-w-8 text-center text-sm font-semibold tabular-nums">
+          <span className="sr-only">{item.icon.displayName} quantity </span>
           {item.quantity}
         </span>
         <Button
@@ -339,10 +342,4 @@ function TrayRow({
       </div>
     </article>
   );
-}
-
-export function mergeSavedSetIcons(
-  current: readonly { readonly icon: IconEntry; readonly quantity: number }[],
-): readonly { readonly icon: IconEntry; readonly quantity: number }[] {
-  return current;
 }
