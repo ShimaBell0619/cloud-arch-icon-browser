@@ -1,3 +1,8 @@
+import {
+  associateSelectedPackageHandle,
+  type PersistableFileHandle,
+} from "./package-handle-store";
+
 interface FileHandleLike {
   getFile(): Promise<File>;
 }
@@ -54,12 +59,31 @@ export async function choosePackageFile({
     );
     const handle = handles[0];
     if (!handle) return null;
-    return await handle.getFile();
+    const file = await handle.getFile();
+    if (isPersistableFileHandle(handle)) {
+      // Keep the handle only in memory until App confirms the ZIP candidate.
+      // A failed replacement therefore cannot overwrite the last good handle.
+      associateSelectedPackageHandle(file, handle);
+    }
+    return file;
   } catch (error) {
     if (isAbortError(error)) return null;
     fallbackInput?.click();
     return null;
   }
+}
+
+function isPersistableFileHandle(
+  handle: FileHandleLike,
+): handle is FileHandleLike & PersistableFileHandle {
+  return (
+    "name" in handle &&
+    typeof handle.name === "string" &&
+    "queryPermission" in handle &&
+    typeof handle.queryPermission === "function" &&
+    "requestPermission" in handle &&
+    typeof handle.requestPermission === "function"
+  );
 }
 
 function isAbortError(error: unknown): boolean {
