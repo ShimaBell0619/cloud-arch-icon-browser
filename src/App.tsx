@@ -54,16 +54,16 @@ import {
   createSavedSet,
   deleteSavedSet,
   getFrequentlyUsedIcons,
-  importSavedSet,
   type IconCategory,
   type IconEntry,
   IconPackageSession,
+  importSavedSet,
   loadPersistedState,
   moveTrayItem,
   type PackageProblem,
-  parseSavedSetShare,
   type PersistedPreferences,
   type PersistedState,
+  parseSavedSetShare,
   reconcilePersistedStateWithIcons,
   reconcileTrayWithIcons,
   recordIconUsage,
@@ -71,8 +71,8 @@ import {
   removeFavorite,
   removeTrayItem,
   resolveSavedSet,
-  savePersistedState,
   type SavedSetRecord,
+  savePersistedState,
   serializeSavedSet,
   setPersistedPreferences,
   setTrayItemQuantity,
@@ -473,7 +473,9 @@ function LoadedWorkspace({
   const [autocompleteOpen, setAutocompleteOpen] = useState(false);
   const [activeAutocompleteIndex, setActiveAutocompleteIndex] = useState(-1);
   const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
   const [copyNotice, setCopyNotice] = useState<{
     readonly kind: "success" | "error";
     readonly message: string;
@@ -559,6 +561,7 @@ function LoadedWorkspace({
     };
   }, []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Selection must reset when the result scope changes.
   useEffect(() => {
     setSelectionMode(false);
     setSelectedIds(new Set());
@@ -706,10 +709,7 @@ function LoadedWorkspace({
     if (!selected.length) return;
     onTrayItemsChange((current) => addIconsToTray(current, selected));
     onPersistedStateChange((state) =>
-      selected.reduce(
-        (current, icon) => recordIconUsage(current, icon),
-        state,
-      ),
+      selected.reduce((current, icon) => recordIconUsage(current, icon), state),
     );
     setSelectionMode(false);
     setSelectedIds(new Set());
@@ -1111,7 +1111,10 @@ function LoadedWorkspace({
             />
           ) : null}
           {dropNotice ? (
-            <Notice message={dropNotice} onDismiss={() => setDropNotice(null)} />
+            <Notice
+              message={dropNotice}
+              onDismiss={() => setDropNotice(null)}
+            />
           ) : null}
 
           {workspaceView === "tray" ? (
@@ -1146,9 +1149,7 @@ function LoadedWorkspace({
               onSaveAsSet={saveTrayAsSet}
               onUpdateSetFromTray={updateSetFromTray}
               onDeleteSet={(set) =>
-                onPersistedStateChange((state) =>
-                  deleteSavedSet(state, set.id),
-                )
+                onPersistedStateChange((state) => deleteSavedSet(state, set.id))
               }
               onLoadSet={loadSavedSet}
               onCopySet={copySavedSet}
@@ -1157,7 +1158,10 @@ function LoadedWorkspace({
           ) : (
             <>
               {showFrequentlyUsed ? (
-                <section aria-labelledby="frequently-used-heading" className="mb-5">
+                <section
+                  aria-labelledby="frequently-used-heading"
+                  className="mb-5"
+                >
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div>
                       <h2
@@ -1220,7 +1224,9 @@ function LoadedWorkspace({
                         onCopy={() => void copyQuick(icon)}
                         onAddToTray={() => addToTray(icon)}
                         onToggleSelected={() =>
-                          setSelectedIds((current) => toggleSetValue(current, icon.id))
+                          setSelectedIds((current) =>
+                            toggleSetValue(current, icon.id),
+                          )
                         }
                       />
                     ))}
@@ -1897,10 +1903,7 @@ function Notice({
       role="status"
       className="mb-3 flex items-start gap-2 rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm text-muted-foreground"
     >
-      <AlertCircleIcon
-        aria-hidden="true"
-        className="mt-0.5 size-4 shrink-0"
-      />
+      <AlertCircleIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
       <span>{message}</span>
       <button
         type="button"

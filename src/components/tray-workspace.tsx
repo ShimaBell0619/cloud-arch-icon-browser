@@ -185,10 +185,7 @@ export function TrayWorkspace({
                     </h3>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {set.items.length} unique icons ·{" "}
-                      {set.items.reduce(
-                        (sum, item) => sum + item.quantity,
-                        0,
-                      )}{" "}
+                      {set.items.reduce((sum, item) => sum + item.quantity, 0)}{" "}
                       total
                     </p>
                   </div>

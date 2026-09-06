@@ -734,7 +734,10 @@ function normalizeSavedSetName(value: unknown): string {
 }
 
 function createSavedSetId(now: number): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `set-${now.toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
