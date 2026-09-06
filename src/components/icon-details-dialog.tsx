@@ -1,34 +1,59 @@
-import { DownloadIcon, XIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CopyIcon,
+  DownloadIcon,
+  FileCode2Icon,
+  LoaderCircleIcon,
+  StarIcon,
+  XIcon,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LazyIconPreview } from "@/components/lazy-icon-preview";
 import { Button } from "@/components/ui/button";
 import { type IconEntry, type IconPackageSession, PackageError } from "@/core";
+import {
+  clipboardErrorMessage,
+  copyIconAsPng,
+  copySvgText,
+} from "@/lib/icon-clipboard";
 
 interface IconDetailsDialogProps {
   session: IconPackageSession;
   icon: IconEntry | null;
   restoreFocusTo: HTMLElement | null;
+  favorite: boolean;
+  onToggleFavorite: () => void;
   onClose: () => void;
 }
+
+type PendingAction = "image" | "svg" | "download" | null;
 
 export function IconDetailsDialog({
   session,
   icon,
   restoreFocusTo,
+  favorite,
+  onToggleFavorite,
   onClose,
 }: IconDetailsDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const primaryButtonRef = useRef<HTMLButtonElement>(null);
+  const [pending, setPending] = useState<PendingAction>(null);
+  const [notice, setNotice] = useState<{
+    readonly kind: "success" | "error";
+    readonly message: string;
+  } | null>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
+    setPending(null);
+    setNotice(null);
     if (icon && !dialog.open) {
       if (typeof dialog.showModal === "function") dialog.showModal();
       else dialog.setAttribute("open", "");
-      queueMicrotask(() => closeButtonRef.current?.focus());
+      queueMicrotask(() => primaryButtonRef.current?.focus());
     } else if (!icon && dialog.open) {
       if (typeof dialog.close === "function") dialog.close();
       else dialog.removeAttribute("open");
@@ -46,14 +71,44 @@ export function IconDetailsDialog({
   };
 
   const handleClosed = () => {
-    setDownloadError(null);
+    setPending(null);
+    setNotice(null);
     onClose();
     queueMicrotask(() => restoreFocusTo?.focus());
   };
 
+  const copyImage = async () => {
+    if (!icon || pending) return;
+    setNotice(null);
+    setPending("image");
+    try {
+      await copyIconAsPng(session, icon);
+      setNotice({ kind: "success", message: "Copied 512×512 PNG image." });
+    } catch (error) {
+      setNotice({ kind: "error", message: clipboardErrorMessage(error) });
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const copySvg = async () => {
+    if (!icon || pending) return;
+    setNotice(null);
+    setPending("svg");
+    try {
+      await copySvgText(session, icon);
+      setNotice({ kind: "success", message: "Copied original SVG text." });
+    } catch (error) {
+      setNotice({ kind: "error", message: clipboardErrorMessage(error) });
+    } finally {
+      setPending(null);
+    }
+  };
+
   const download = async () => {
-    if (!icon) return;
-    setDownloadError(null);
+    if (!icon || pending) return;
+    setNotice(null);
+    setPending("download");
     try {
       const item = await session.getDownload(icon.id);
       const anchor = document.createElement("a");
@@ -61,19 +116,27 @@ export function IconDetailsDialog({
       anchor.download = item.filename;
       anchor.click();
     } catch (error) {
-      setDownloadError(
-        error instanceof PackageError
-          ? error.problem.message
-          : "The original SVG could not be prepared for download.",
-      );
+      setNotice({
+        kind: "error",
+        message:
+          error instanceof PackageError
+            ? error.problem.message
+            : "The original SVG could not be prepared for download.",
+      });
+    } finally {
+      setPending(null);
     }
   };
+
+  const canCopySvg =
+    typeof navigator !== "undefined" &&
+    typeof navigator.clipboard?.writeText === "function";
 
   return (
     <dialog
       ref={dialogRef}
       aria-labelledby="icon-details-title"
-      className="m-auto w-[min(92vw,34rem)] max-h-[90svh] overflow-y-auto rounded-2xl border border-border bg-card p-0 text-card-foreground backdrop:bg-dialog-backdrop"
+      className="m-auto w-[min(92vw,36rem)] max-h-[90svh] overflow-y-auto rounded-2xl border border-border bg-card p-0 text-card-foreground backdrop:bg-dialog-backdrop"
       onClose={handleClosed}
       onCancel={(event) => {
         event.preventDefault();
@@ -103,21 +166,41 @@ export function IconDetailsDialog({
                 {icon.displayName}
               </h2>
             </div>
-            <Button
-              ref={closeButtonRef}
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Close icon details"
-              onClick={close}
-            >
-              <XIcon aria-hidden="true" />
-            </Button>
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={
+                  favorite
+                    ? `Remove ${icon.displayName} from favorites`
+                    : `Add ${icon.displayName} to favorites`
+                }
+                aria-pressed={favorite}
+                title={favorite ? "Remove favorite" : "Add favorite"}
+                onClick={onToggleFavorite}
+              >
+                <StarIcon
+                  aria-hidden="true"
+                  fill={favorite ? "currentColor" : "none"}
+                  className={favorite ? "text-primary" : undefined}
+                />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Close icon details"
+                onClick={close}
+              >
+                <XIcon aria-hidden="true" />
+              </Button>
+            </div>
           </div>
 
           <LazyIconPreview session={session} icon={icon} eager large />
 
-          <dl className="mt-5 grid gap-4 text-sm">
+          <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-xs font-medium text-muted-foreground">
                 Category
@@ -134,21 +217,71 @@ export function IconDetailsDialog({
             </div>
           </dl>
 
-          {downloadError ? (
+          {notice ? (
             <p
-              role="alert"
-              className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              role={notice.kind === "error" ? "alert" : "status"}
+              className={`mt-4 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm ${notice.kind === "error" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border bg-muted/60 text-foreground"}`}
             >
-              {downloadError}
+              {notice.kind === "success" ? (
+                <CheckIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              ) : null}
+              <span>{notice.message}</span>
             </p>
           ) : null}
 
-          <div className="mt-6 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={close}>
-              Close
+          <div className="mt-6 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+            <Button
+              ref={primaryButtonRef}
+              type="button"
+              size="lg"
+              disabled={pending !== null}
+              onClick={() => void copyImage()}
+            >
+              {pending === "image" ? (
+                <LoaderCircleIcon
+                  aria-hidden="true"
+                  data-icon="inline-start"
+                  className="animate-spin"
+                />
+              ) : (
+                <CopyIcon aria-hidden="true" data-icon="inline-start" />
+              )}
+              Copy image
             </Button>
-            <Button type="button" onClick={() => void download()}>
-              <DownloadIcon aria-hidden="true" data-icon="inline-start" />
+            {canCopySvg ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={pending !== null}
+                onClick={() => void copySvg()}
+              >
+                {pending === "svg" ? (
+                  <LoaderCircleIcon
+                    aria-hidden="true"
+                    data-icon="inline-start"
+                    className="animate-spin"
+                  />
+                ) : (
+                  <FileCode2Icon aria-hidden="true" data-icon="inline-start" />
+                )}
+                Copy SVG
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pending !== null}
+              onClick={() => void download()}
+            >
+              {pending === "download" ? (
+                <LoaderCircleIcon
+                  aria-hidden="true"
+                  data-icon="inline-start"
+                  className="animate-spin"
+                />
+              ) : (
+                <DownloadIcon aria-hidden="true" data-icon="inline-start" />
+              )}
               Download SVG
             </Button>
           </div>
