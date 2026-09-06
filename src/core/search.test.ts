@@ -77,6 +77,25 @@ describe("icon search", () => {
     expect(index.search("other", "Dummy/Compute")).toEqual([]);
   });
 
+  it("deduplicates identical original filenames only in global scope", () => {
+    const duplicateIcons = parsePackageMetadata(
+      [
+        "Dummy/Shared/A/7-icon-service-Shared.svg",
+        "Dummy/Shared/B/7-icon-service-Shared.svg",
+      ].map((path) => entryMetadata(path)),
+      4096,
+    ).icons;
+    const duplicateIndex = new IconSearchIndex(duplicateIcons);
+
+    expect(duplicateIndex.search("")).toHaveLength(1);
+    expect(duplicateIndex.search("shared")).toHaveLength(1);
+    expect(duplicateIndex.search("")[0]?.icon.id).toBe(
+      "Dummy/Shared/A/7-icon-service-Shared.svg",
+    );
+    expect(duplicateIndex.search("", "Dummy/Shared")).toHaveLength(2);
+    expect(duplicateIndex.search("shared", "Dummy/Shared")).toHaveLength(2);
+  });
+
   it("returns all icons alphabetically for empty/separator-only queries without a result cap", () => {
     expect(index.search(" - \t").map(({ icon }) => icon.displayName)).toEqual([
       "App Service",
@@ -89,7 +108,9 @@ describe("icon search", () => {
     const large = new IconSearchIndex(
       parsePackageMetadata(
         Array.from({ length: 160 }, (_, i) =>
-          entryMetadata(`Group${i}/1-icon-service-Same-Resource.svg`),
+          entryMetadata(
+            `Group${i}/${i}-icon-service-Same-Resource-${i}.svg`,
+          ),
         ),
         4096,
       ).icons,
@@ -97,7 +118,7 @@ describe("icon search", () => {
     expect(large.search("same")).toHaveLength(160);
     expect(large.search("sameresorce")).toHaveLength(160);
     expect(large.search("")[0]?.icon.id).toBe(
-      "Group0/1-icon-service-Same-Resource.svg",
+      "Group0/0-icon-service-Same-Resource-0.svg",
     );
     expect(new IconSearchIndex([]).search("x")).toEqual([]);
   });
