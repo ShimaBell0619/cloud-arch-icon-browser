@@ -3,15 +3,24 @@ import {
   ArrowUpIcon,
   ClipboardCopyIcon,
   ClipboardPasteIcon,
+  LoaderCircleIcon,
   MinusIcon,
   PlusIcon,
   SaveIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LazyIconPreview } from "@/components/lazy-icon-preview";
 import { Button } from "@/components/ui/button";
 import type { IconPackageSession, SavedSetRecord, TrayItem } from "@/core";
+import { isExperimentalPowerPointCopyAllEnabled } from "@/lib/feature-flags";
+import {
+  copyTrayToPowerPoint,
+  getPowerPointCopyCapability,
+  type PowerPointCopyCapability,
+  POWERPOINT_EXPERIMENT_ACK_KEY,
+  powerPointCopyErrorMessage,
+} from "@/lib/powerpoint-copy";
 
 interface TrayWorkspaceProps {
   session: IconPackageSession;
@@ -50,7 +59,23 @@ export function TrayWorkspace({
   const [renamingSetId, setRenamingSetId] = useState<string | null>(null);
   const [renameName, setRenameName] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [powerPointCapability, setPowerPointCapability] =
+    useState<PowerPointCopyCapability | null>(null);
+  const [copyAllPending, setCopyAllPending] = useState(false);
+  const [showExperimentalWarning, setShowExperimentalWarning] = useState(false);
   const total = items.reduce((sum, item) => sum + item.quantity, 0);
+  const powerPointFeatureEnabled = isExperimentalPowerPointCopyAllEnabled();
+
+  useEffect(() => {
+    if (!powerPointFeatureEnabled) return;
+    let cancelled = false;
+    void getPowerPointCopyCapability().then((capability) => {
+      if (!cancelled) setPowerPointCapability(capability);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [powerPointFeatureEnabled]);
 
   const save = () => {
     if (!onSaveAsSet(setName)) {
@@ -78,6 +103,37 @@ export function TrayWorkspace({
     }
   };
 
+  const runCopyAll = async (acknowledged = false) => {
+    if (!powerPointCapability?.available || !items.length || copyAllPending) {
+      return;
+    }
+    if (!acknowledged && !hasPowerPointExperimentAcknowledgement()) {
+      setShowExperimentalWarning(true);
+      return;
+    }
+
+    setShowExperimentalWarning(false);
+    setNotice(null);
+    setCopyAllPending(true);
+    try {
+      const objectCount = await copyTrayToPowerPoint(
+        session,
+        items,
+        powerPointCapability,
+      );
+      setNotice(
+        `Prepared ${objectCount} PowerPoint objects. Paste once in PowerPoint.`,
+      );
+    } catch (error) {
+      setNotice(powerPointCopyErrorMessage(error));
+    } finally {
+      setCopyAllPending(false);
+    }
+  };
+
+  const maxPowerPointObjects = powerPointCapability?.maxObjects ?? 36;
+  const copyAllOverLimit = total > maxPowerPointObjects;
+
   return (
     <div className="space-y-6">
       <section aria-labelledby="tray-heading">
@@ -90,13 +146,96 @@ export function TrayWorkspace({
               {items.length} unique icons · {total} total objects
             </p>
           </div>
-          {items.length ? (
-            <Button type="button" variant="outline" onClick={onClear}>
-              <Trash2Icon aria-hidden="true" data-icon="inline-start" />
-              Clear Tray
-            </Button>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {powerPointFeatureEnabled && items.length ? (
+              <Button
+                type="button"
+                disabled={
+                  copyAllPending ||
+                  copyAllOverLimit ||
+                  powerPointCapability?.available !== true
+                }
+                onClick={() => void runCopyAll()}
+              >
+                {copyAllPending || powerPointCapability === null ? (
+                  <LoaderCircleIcon
+                    aria-hidden="true"
+                    data-icon="inline-start"
+                    className="animate-spin"
+                  />
+                ) : (
+                  <ClipboardCopyIcon aria-hidden="true" data-icon="inline-start" />
+                )}
+                Copy all
+                <span className="rounded-md border border-primary-foreground/35 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                  Experimental
+                </span>
+              </Button>
+            ) : null}
+            {items.length ? (
+              <Button type="button" variant="outline" onClick={onClear}>
+                <Trash2Icon aria-hidden="true" data-icon="inline-start" />
+                Clear Tray
+              </Button>
+            ) : null}
+          </div>
         </div>
+
+        {powerPointFeatureEnabled && items.length ? (
+          <div className="mt-2 text-xs text-muted-foreground">
+            {powerPointCapability === null ? (
+              <p role="status">Checking Windows PowerPoint integration…</p>
+            ) : powerPointCapability.available ? (
+              copyAllOverLimit ? (
+                <p role="status">
+                  Experimental Copy all supports at most {maxPowerPointObjects}{" "}
+                  objects.
+                </p>
+              ) : (
+                <p>
+                  Copy all uses the local Windows PowerPoint bridge and never
+                  falls back to a flattened image.
+                </p>
+              )
+            ) : (
+              <p role="status">
+                Experimental Copy all is available only from the Windows npx
+                runtime.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {showExperimentalWarning ? (
+          <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+            <p className="font-medium">Experimental PowerPoint integration</p>
+            <p className="mt-1 text-muted-foreground">
+              Copy all is shipping before real-machine validation is available.
+              It may fail with some PowerPoint environments. It will never
+              replace your Tray with one flattened bitmap.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  rememberPowerPointExperimentAcknowledgement();
+                  void runCopyAll(true);
+                }}
+              >
+                Continue
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setShowExperimentalWarning(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         {items.length ? (
           <div className="mt-4 space-y-2">
@@ -429,4 +568,22 @@ function TrayRow({
       </div>
     </article>
   );
+}
+
+function hasPowerPointExperimentAcknowledgement(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(POWERPOINT_EXPERIMENT_ACK_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberPowerPointExperimentAcknowledgement(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(POWERPOINT_EXPERIMENT_ACK_KEY, "1");
+  } catch {
+    // Acknowledgement persistence is optional; the warning can reappear.
+  }
 }

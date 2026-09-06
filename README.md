@@ -25,14 +25,34 @@ On browsers that support the File System Access API, a successfully validated se
 
 - Fast search across icon names, original filenames, and category paths.
 - Category browsing with explicit search filter chips.
-- Favorites, recent icons, recent searches, and Grid / Compact views.
+- Favorites, recently used icons, recent searches, Frequently used shortcuts, Tray, Saved Sets, and Grid / Compact views.
 - Centered icon details with real package metadata.
 - Copy icons as transparent 512×512 PNG images for compatible clipboard workflows such as Windows PowerPoint and Excel.
-- Copy SVG where supported or download the original SVG with its original filename.
+- Copy original SVG source text where supported or download the original SVG with its original filename.
+- Experimental Windows PowerPoint `Copy all` from the Tray in the packaged `npx` runtime, preserving Tray order and quantities without a flattened-image fallback.
 - System, Light, and Dark themes with responsive keyboard-accessible navigation.
 - Local-only package processing with no automatic runtime network access; supported browsers can remember only a local file reference for the previous ZIP.
 
 `Copy image` depends on browser Clipboard API support and permission. If image clipboard writes are unavailable or denied, the app reports the failure and the original SVG remains available for download.
+
+### Experimental PowerPoint Copy all
+
+On Windows, the packaged `npx` runtime exposes an explicitly Experimental `Copy all` action in the Tray. It prepares up to 36 transient 512×512 PNG representations, preserves Tray order and quantities, asks desktop PowerPoint to copy them as a multi-shape selection, and then lets you paste once in PowerPoint. Generated PNGs and temporary Office files stay local and are deleted after the operation. There is no cloud service and no flattened combined-image fallback.
+
+This workflow is **not yet formally supported** because real-machine Windows 11 + current Chromium + Microsoft 365 PowerPoint validation is still pending. The UI shows an Experimental warning on first use. If the later validation fails, the feature will be disabled or removed rather than replaced by a flattened image.
+
+The feature is enabled by default for evaluation. To disable it locally, run this in the app's browser developer console and reload:
+
+```js
+localStorage.setItem(
+  "cloud-arch-icon-browser:feature:powerpoint-copy-all",
+  "off",
+);
+```
+
+Delete that key (or set it to `on`) to return to the built-in default. The existing single-icon `Copy image` workflow remains the stable cross-platform baseline.
+
+True vector clipboard copy and direct browser-to-PowerPoint drag are not part of this Experimental release. The `Copy SVG source` action copies SVG markup text; it is not a vector-image clipboard operation.
 
 ## Official Azure icons
 

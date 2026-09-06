@@ -1,6 +1,8 @@
 import type { IconEntry, IconPackageSession } from "@/core";
 
 export const COPY_IMAGE_SIZE = 512;
+const NORMALIZATION_PROBE_SIZE = 1024;
+const NORMALIZED_CONTENT_PADDING = 48;
 
 export class ClipboardImageError extends Error {
   constructor(message: string) {
@@ -10,6 +12,13 @@ export class ClipboardImageError extends Error {
 }
 
 export interface FittedImageRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface AlphaBounds {
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -43,6 +52,47 @@ export function fitImageIntoSquare(
   };
 }
 
+export function findVisibleAlphaBounds(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  alphaThreshold = 8,
+): AlphaBounds | null {
+  if (
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    data.length < width * height * 4
+  ) {
+    throw new ClipboardImageError("The rendered image has invalid pixel data.");
+  }
+
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const alpha = data[(y * width + x) * 4 + 3] ?? 0;
+      if (alpha <= alphaThreshold) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return null;
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+  };
+}
+
 export async function renderSvgBlobToPng(
   source: Blob,
   size = COPY_IMAGE_SIZE,
@@ -50,25 +100,82 @@ export async function renderSvgBlobToPng(
   const url = URL.createObjectURL(source);
   try {
     const image = await loadImage(url);
-    const rect = fitImageIntoSquare(
-      image.naturalWidth,
-      image.naturalHeight,
-      size,
-    );
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
+    return await renderImageToPng(image, size);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
-    const context = canvas.getContext("2d");
-    if (!context) {
+export async function renderSvgBlobToNormalizedPng(
+  source: Blob,
+  size = COPY_IMAGE_SIZE,
+): Promise<Blob> {
+  const url = URL.createObjectURL(source);
+  try {
+    const image = await loadImage(url);
+    const probe = document.createElement("canvas");
+    probe.width = NORMALIZATION_PROBE_SIZE;
+    probe.height = NORMALIZATION_PROBE_SIZE;
+    const probeContext = probe.getContext("2d");
+    if (!probeContext) {
       throw new ClipboardImageError(
-        "This browser could not prepare the image for copying.",
+        "This browser could not inspect the image for normalized copying.",
       );
     }
 
-    context.clearRect(0, 0, size, size);
-    context.drawImage(image, rect.x, rect.y, rect.width, rect.height);
+    const probeRect = fitImageIntoSquare(
+      image.naturalWidth,
+      image.naturalHeight,
+      NORMALIZATION_PROBE_SIZE,
+    );
+    probeContext.clearRect(0, 0, probe.width, probe.height);
+    probeContext.drawImage(
+      image,
+      probeRect.x,
+      probeRect.y,
+      probeRect.width,
+      probeRect.height,
+    );
+    const pixels = probeContext.getImageData(0, 0, probe.width, probe.height);
+    const bounds = findVisibleAlphaBounds(
+      pixels.data,
+      probe.width,
+      probe.height,
+    );
+    if (!bounds) return await renderImageToPng(image, size);
 
+    const probeScale = probeRect.width / image.naturalWidth;
+    const visibleSourceX = (bounds.x - probeRect.x) / probeScale;
+    const visibleSourceY = (bounds.y - probeRect.y) / probeScale;
+    const visibleSourceWidth = bounds.width / probeScale;
+    const visibleSourceHeight = bounds.height / probeScale;
+    const contentSize = Math.max(1, size - NORMALIZED_CONTENT_PADDING * 2);
+    const finalScale = Math.min(
+      contentSize / visibleSourceWidth,
+      contentSize / visibleSourceHeight,
+    );
+    const visibleWidth = visibleSourceWidth * finalScale;
+    const visibleHeight = visibleSourceHeight * finalScale;
+    const visibleLeft = (size - visibleWidth) / 2;
+    const visibleTop = (size - visibleHeight) / 2;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new ClipboardImageError(
+        "This browser could not prepare the normalized image for copying.",
+      );
+    }
+    context.clearRect(0, 0, size, size);
+    context.drawImage(
+      image,
+      visibleLeft - visibleSourceX * finalScale,
+      visibleTop - visibleSourceY * finalScale,
+      image.naturalWidth * finalScale,
+      image.naturalHeight * finalScale,
+    );
     return await canvasToBlob(canvas);
   } finally {
     URL.revokeObjectURL(url);
@@ -112,11 +219,7 @@ export async function copyIconAsPng(
   session: IconPackageSession,
   icon: IconEntry,
 ): Promise<void> {
-  // Start Clipboard.write synchronously from the click handler and supply a
-  // Promise representation while the source is safely rendered. This retains
-  // transient user activation on browsers that require it for clipboard writes.
   const png = (async () => {
-    // getPreviewUrl performs the existing defense-in-depth SVG preview check.
     await session.getPreviewUrl(icon.id);
     const source = await session.getSvgBlob(icon.id);
     return renderSvgBlobToPng(source, COPY_IMAGE_SIZE);
@@ -156,6 +259,25 @@ export function clipboardErrorMessage(error: unknown): string {
   return error instanceof ClipboardImageError
     ? error.message
     : "Copy failed. Try again or use Download SVG.";
+}
+
+async function renderImageToPng(
+  image: HTMLImageElement,
+  size: number,
+): Promise<Blob> {
+  const rect = fitImageIntoSquare(image.naturalWidth, image.naturalHeight, size);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new ClipboardImageError(
+      "This browser could not prepare the image for copying.",
+    );
+  }
+  context.clearRect(0, 0, size, size);
+  context.drawImage(image, rect.x, rect.y, rect.width, rect.height);
+  return await canvasToBlob(canvas);
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {

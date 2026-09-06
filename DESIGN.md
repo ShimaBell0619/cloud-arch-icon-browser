@@ -31,7 +31,7 @@ The following require an explicit design decision before implementation:
 - a supported hosted service, backend, database, account system, cloud sync, or telemetry,
 - automatic package download or runtime package/version checking,
 - persistence of the selected ZIP bytes, SVG bodies, generated image data, or package session outside the explicitly approved file-handle metadata boundary,
-- SVG editing, diagram-canvas/project management, or Office multi-object bulk copy/export; Tray multi-select is an approved collection workflow,
+- SVG editing or diagram-canvas/project management; Office multi-object copy is limited to the explicitly approved Experimental Windows localhost bridge contract below,
 - raster file export beyond the transient clipboard PNG workflow,
 - PWA/service-worker behavior or a multi-page/router architecture,
 - additional distribution channels such as native apps, Homebrew, Chocolatey, winget, or Docker,
@@ -57,11 +57,33 @@ Runtime policy:
 - ESM-only package; `package-lock.json` is committed and CI/release use `npm ci`.
 - Supported operating systems: Windows, macOS, and Linux.
 
-The packaged CLI serves the app from the canonical origin `http://127.0.0.1:41731/`. It never falls back to a random port. If that origin already serves a matching Cloud Arch Icon Browser instance, a second invocation reuses/opens it; if another process owns the port, startup fails with an actionable error. The server remains bound only to `127.0.0.1`, supports only static `GET`/`HEAD`, rejects unsafe paths and unexpected Host headers, returns `405` for mutating methods, attempts to open the default browser, and stops on `Ctrl+C` when this invocation owns the server.
+The packaged CLI serves the app from the canonical origin `http://127.0.0.1:41731/`. It never falls back to a random port. If that origin already serves a matching Cloud Arch Icon Browser instance, a second invocation reuses/opens it; if another process owns the port, startup fails with an actionable error. The server remains bound only to `127.0.0.1`, serves static content with `GET`/`HEAD`, rejects unsafe paths and unexpected Host headers, attempts to open the default browser, and stops on `Ctrl+C` when this invocation owns the server. Mutating methods remain rejected except for the explicitly approved Experimental PowerPoint bridge endpoint described below.
 
 Public CLI options are limited to no arguments, `-h`/`--help`, and `-v`/`--version`. Additional host/port/ZIP-path options are not part of the current contract.
 
 GitHub Pages may publish repository-owned static builds for maintainer review. Same-repository PRs may use stable `/pr-N/` previews; fork PRs remain build-only. Pages must preserve the same local ZIP-processing and no-persistence boundaries. See `docs/UI_REVIEW.md`.
+
+### Experimental Windows PowerPoint bridge
+
+The packaged Windows `npx` runtime may expose an Experimental, default-enabled Tray `Copy all` workflow before formal real-machine validation is complete. It is not a general backend/API and must remain unavailable outside the canonical local runtime.
+
+Approved bridge contract:
+
+- bind only to the existing `127.0.0.1:41731` server; do not add another listener or cloud service,
+- expose only `GET /__bridge/powerpoint/capability` and `POST /__bridge/powerpoint/copy-all`,
+- validate the normal Host allowlist before bridge routing,
+- require the exact canonical Origin plus a per-process unguessable capability token for the mutating operation,
+- accept only application-owned JSON containing base64 PNG representations and integer quantities; never accept arbitrary local paths, commands, scripts, PowerShell arguments, shell input, COM method names, or generic automation requests,
+- limit a request to 36 output objects, bounded per-image/body sizes, one active operation, and a deterministic timeout,
+- create all temporary image/manifest paths on the server under an unpredictable app-owned OS temp directory and delete them deterministically on success/failure where possible,
+- invoke only the fixed embedded PowerShell/PowerPoint automation sequence required to build a temporary hidden presentation, add one independent picture shape per expanded Tray quantity, copy a deterministic grid `ShapeRange`, close the temporary presentation, and release COM resources,
+- attach to an already-running PowerPoint instance without quitting it; if automation creates its own PowerPoint application, it owns and closes that application,
+- never persist generated PNGs, manifests, Office documents, source SVG bodies, or automation payloads,
+- never fall back to a flattened combined bitmap.
+
+The feature flag key is `cloud-arch-icon-browser:feature:powerpoint-copy-all`; its built-in v0.3 default is enabled, while a local `off` override disables the UI. The first use must show an explicit Experimental warning. Real Windows 11 + current Chromium + desktop Microsoft 365 PowerPoint validation remains tracked separately in Issue #57. Until that validation succeeds, `Copy all` is Experimental rather than formally supported. If validation fails, disable/remove the capability instead of weakening the contract or introducing a flattened fallback.
+
+True vector-image clipboard copy and direct browser-to-PowerPoint drag remain deferred until separately validated; the current SVG clipboard action is source-text copy only.
 
 ## 3. Technology and architecture
 
@@ -222,6 +244,8 @@ Narrow/mobile layouts replace the desktop sidebar with a Drawer/Sheet and must a
 - Saved Set sharing uses an explicit versioned Clipboard text payload (`cloud-arch-icon-browser/saved-set`, schema version 1). Clipboard input is untrusted and must validate before import/application; no ZIP/SVG/generated bytes are included.
 - Grid is the default; Grid/Compact is persisted.
 - Card body opens details; Favorite and Add-to-Tray are separate accessible controls. `Copy` remains the primary single-icon quick action.
+- On the canonical Windows `npx` runtime, the Tray may expose Experimental `Copy all` when the local feature flag is enabled. It expands quantities into up to 36 independent PowerPoint picture-shape candidates in Tray order, uses a deterministic left-to-right/top-to-bottom grid, and requires a one-time Experimental acknowledgement before the first operation. Unsupported runtimes show a clean unavailable state rather than attempting automation.
+- Experimental `Copy all` success means the local bridge prepared PowerPoint's clipboard operation; until Issue #57 validates real-machine paste behavior, the UI and documentation must not claim formal independent-shape compatibility. There is no flattened-image fallback.
 
 ### Details dialog and copy/download actions
 
@@ -230,7 +254,7 @@ The centered details dialog shows only real package/application data: preview, d
 Action hierarchy:
 
 - primary: `Copy image`, producing a transient transparent 512×512 PNG with preserved aspect ratio and centered content,
-- secondary: `Copy SVG` where supported,
+- secondary: `Copy SVG source` where supported; this copies original SVG markup text and is not vector-image clipboard copy,
 - secondary: `Download SVG`, preserving the exact original bytes and filename.
 
 Clipboard failures must produce actionable feedback and must not affect the original SVG download path. Do not invent Azure resource descriptions or Microsoft Learn mappings.
@@ -248,6 +272,8 @@ Primary flows must support keyboard operation, visible focus, correct button/dia
 - Preview SVGs only in an image context such as `<img>` backed by a session-owned Blob URL. Never inject untrusted SVG markup into the application DOM with `innerHTML` or equivalent APIs.
 - Perform a conservative detached preview check for malformed/active/external content. Unsafe previews may be refused while original bytes remain available for explicit download.
 - Clipboard PNG creation is transient; generated Canvas/PNG/Blob data is not persisted.
+- Experimental multi-object representations must pass the same preview-safety gate before source SVG extraction. For perceived-size normalization, render to an offscreen canvas, detect non-transparent alpha bounds, and refit the visible artwork into a transparent 512×512 square with consistent padding without mutating the source SVG.
+- The Experimental PowerPoint bridge must preserve the strict Host/Origin/capability/payload/temp-file boundaries defined in section 2 and must never expose a generic localhost execution surface.
 - The local server must send a restrictive CSP and appropriate browser security headers. Do not enable `unsafe-eval`.
 - Runtime dependencies must not require a CDN or external API after static assets are loaded.
 - A fatal React error path must dispose the active package session and return to a safe initial state without sending crash data.
@@ -265,7 +291,7 @@ Core/domain logic has the deepest unit coverage. Minimum core coverage gates are
 
 Playwright covers the representative end-to-end flow, accessibility checks, and a deliberately small stable visual-regression baseline. Tests and review artifacts use only project-owned synthetic ZIP/SVG fixtures; Microsoft icon assets must never become test fixtures or committed visual baselines.
 
-CI includes Linux foundation/browser checks plus packaged CLI smoke validation on Windows and macOS; CodeQL is enabled. See `CONTRIBUTING.md` and `docs/UI_REVIEW.md` for commands and review procedures.
+CI includes Linux foundation/browser checks plus packaged CLI smoke validation on Windows and macOS; CodeQL is enabled. Windows-specific bridge tests may inject platform/automation runners and must never require Microsoft Office or Microsoft icon assets on hosted CI. See `CONTRIBUTING.md` and `docs/UI_REVIEW.md` for commands and review procedures.
 
 Dependency/package policy:
 
@@ -280,6 +306,8 @@ Dependency/package policy:
 Changesets records release intent and updates versions/CHANGELOG. Publication uses GitHub Actions npm Trusted Publishing/OIDC; do not introduce a long-lived npm publish token.
 
 Version identity must match across `package.json`, npm, immutable `vX.Y.Z` Git tag, and GitHub Release. Before `1.0.0`, compatible fixes are patch releases while features or breaking changes are minor releases; breaking `0.x` changes must be called out clearly.
+
+An explicitly labeled Experimental Office capability may be released before real-machine validation only when the design decision, feature flag, user-facing warning, security boundary, failure policy, and follow-up validation Issue are all documented. Such a capability is not formally supported until the required real-machine validation succeeds. If validation fails, disable/remove it; never substitute a behavior that violates the product contract such as flattened multi-object Copy.
 
 Official-package verification is maintainer-only:
 

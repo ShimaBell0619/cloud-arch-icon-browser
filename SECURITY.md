@@ -30,8 +30,9 @@ The most security-sensitive areas of this project are:
 - ZIP entry path handling,
 - SVG preview behavior,
 - Blob URL lifecycle,
-- localhost static server routing,
-- Host header validation / DNS rebinding resistance,
+- localhost static server and Experimental PowerPoint bridge routing,
+- Host/Origin validation and DNS rebinding resistance,
+- PowerPoint COM automation and temporary-file cleanup,
 - CSP and browser security headers,
 - npm package contents and dependency supply chain.
 
@@ -41,13 +42,27 @@ The intended security model includes:
 
 - local processing only,
 - server bind to `127.0.0.1`,
-- no application backend/API,
+- no remote application backend or cloud API,
 - no automatic runtime external network communication,
 - no telemetry or crash reporting,
 - SVG preview in an image context rather than DOM markup injection,
 - original SVG bytes preserved for explicit download,
 - no persistence of the user's selected Microsoft ZIP/SVG data,
 - restrictive CSP and related response headers.
+
+The Experimental Windows PowerPoint `Copy all` bridge is a narrowly scoped exception to the otherwise static localhost server:
+
+- it exists only in the packaged local runtime and reports unavailable on non-Windows platforms;
+- the only Office routes are a read-only capability endpoint and the fixed `Copy all` endpoint;
+- normal Host validation still runs before bridge routing;
+- the mutating endpoint requires the exact canonical app Origin plus a per-process random capability token that unrelated web pages cannot read or set through ordinary cross-origin requests;
+- requests accept only bounded JSON containing PNG bytes and quantities, with a maximum of 36 output objects, bounded image/body sizes, one active operation, and a deterministic timeout;
+- the server creates all filesystem paths under an unpredictable app-owned temporary directory and removes generated PNGs, manifest data, and temporary Office state on completion/failure where possible;
+- the browser cannot supply arbitrary filesystem paths, commands, PowerShell, shell arguments, COM methods, or generic automation requests;
+- PowerShell receives a fixed embedded automation program and only an internal manifest path created by the server;
+- no copied image bytes or Office automation payloads are persisted by the application.
+
+The Office lifecycle is intentionally marked Experimental until the real-machine validation tracked in Issue #57 is complete. A failed validation must result in disabling/removing the feature rather than weakening these boundaries or falling back to a flattened image.
 
 ## Out of scope assumptions
 
