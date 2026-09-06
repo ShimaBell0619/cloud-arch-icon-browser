@@ -1,0 +1,48 @@
+name: Temporary fix PR 54
+
+on:
+  push:
+    branches:
+      - feat/46-47-tray-saved-sets
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/46-47-tray-saved-sets
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - name: Preserve intentional selection-reset dependencies
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/App.tsx')
+          text = path.read_text()
+          old = '''  useEffect(() => {\n    setSelectionMode(false);\n    setSelectedIds(new Set());\n  }, [debouncedQuery, selectedCategory, workspaceView]);'''
+          new = '''  // biome-ignore lint/correctness/useExhaustiveDependencies: Selection must reset when the result scope changes.\n  useEffect(() => {\n    setSelectionMode(false);\n    setSelectedIds(new Set());\n  }, [debouncedQuery, selectedCategory, workspaceView]);'''
+          if old not in text:
+              raise SystemExit('selection reset effect not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - run: npx biome check --write src/App.tsx src/components/tray-workspace.tsx src/core/index.ts src/core/persistence.ts src/core/persistence.test.ts src/core/tray.ts src/core/tray.test.ts
+      - name: Commit fixes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/components/tray-workspace.tsx src/core/index.ts src/core/persistence.ts src/core/persistence.test.ts src/core/tray.ts src/core/tray.test.ts
+          git commit -m "chore: apply Biome fixes"
+          git push origin HEAD:feat/46-47-tray-saved-sets
