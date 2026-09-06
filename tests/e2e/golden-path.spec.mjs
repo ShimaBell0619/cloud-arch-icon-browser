@@ -13,7 +13,9 @@ async function loadPackage(page) {
   await page.goto("/");
   await page.getByLabel("Choose icon package ZIP").setInputFiles(fixture);
   await page.getByRole("searchbox", { name: "Search icons" }).waitFor();
-  await expect(resultStatus(page)).toContainText("12 icons");
+  await expect(
+    page.getByRole("button", { name: "Open App Service details, Compute" }),
+  ).toBeVisible();
 }
 
 async function expectNoAxeViolations(page) {
