@@ -5,7 +5,9 @@ import {
   resolveRememberedPackageFile,
 } from "./package-handle-store";
 
-function storageFor(handle: PersistableFileHandle | null): PackageHandleStorage {
+function storageFor(
+  handle: PersistableFileHandle | null,
+): PackageHandleStorage {
   return {
     get: vi.fn(async () => handle),
     set: vi.fn(async () => undefined),
