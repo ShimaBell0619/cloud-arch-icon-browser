@@ -2,19 +2,27 @@ import { describe, expect, it } from "vitest";
 import {
   addFavorite,
   createDefaultPersistedState,
+  createSavedSet,
+  deleteSavedSet,
+  getFrequentlyUsedIcons,
+  importSavedSet,
   loadPersistedState,
   PERSISTENCE_KEY,
   PERSISTENCE_SCHEMA_VERSION,
   parsePersistedState,
+  parseSavedSetShare,
   RECENT_ICON_LIMIT,
   RECENT_SEARCH_LIMIT,
   reconcilePersistedStateWithIcons,
-  recordRecentIcon,
+  recordIconUsage,
   recordRecentSearch,
   removeFavorite,
+  resolveSavedSet,
   type StorageLike,
   savePersistedState,
+  serializeSavedSet,
   setPersistedPreferences,
+  updateSavedSet,
 } from "./persistence";
 import type { IconEntry } from "./types";
 
@@ -59,7 +67,52 @@ describe("persistence", () => {
     );
   });
 
-  it("defensively parses v1 data and defaults invalid preference fields", () => {
+  it("migrates v1 while intentionally resetting details-open Recent history", () => {
+    const old = icon(1);
+    const parsed = parsePersistedState(
+      JSON.stringify({
+        schemaVersion: 1,
+        preferences: {
+          theme: "dark",
+          view: "compact",
+          sidebarCollapsed: true,
+        },
+        favorites: [
+          {
+            canonicalPath: `${old.categoryPath}/${old.originalFilename}`,
+            originalFilename: old.originalFilename,
+            displayName: old.displayName,
+            categoryPath: old.categoryPath,
+            savedAt: 10,
+          },
+        ],
+        recentIcons: [
+          {
+            canonicalPath: `${old.categoryPath}/${old.originalFilename}`,
+            originalFilename: old.originalFilename,
+            displayName: old.displayName,
+            categoryPath: old.categoryPath,
+            openedAt: 20,
+          },
+        ],
+        recentSearches: ["  App Service  ", "app service"],
+      }),
+    );
+
+    expect(parsed.schemaVersion).toBe(PERSISTENCE_SCHEMA_VERSION);
+    expect(parsed.preferences).toEqual({
+      theme: "dark",
+      view: "compact",
+      sidebarCollapsed: true,
+    });
+    expect(parsed.favorites).toHaveLength(1);
+    expect(parsed.recentIcons).toEqual([]);
+    expect(parsed.iconUsage).toEqual([]);
+    expect(parsed.savedSets).toEqual([]);
+    expect(parsed.recentSearches).toEqual(["App Service"]);
+  });
+
+  it("defensively parses v2 data and defaults invalid preference fields", () => {
     const parsed = parsePersistedState(
       JSON.stringify({
         schemaVersion: PERSISTENCE_SCHEMA_VERSION,
@@ -71,6 +124,8 @@ describe("persistence", () => {
         favorites: [],
         recentIcons: [],
         recentSearches: ["  App Service  ", "app service", "", 42],
+        savedSets: [],
+        iconUsage: [],
       }),
     );
 
@@ -80,23 +135,6 @@ describe("persistence", () => {
       sidebarCollapsed: false,
     });
     expect(parsed.recentSearches).toEqual(["App Service"]);
-  });
-
-  it("normalizes parsed Recent icons to newest-first ordering", () => {
-    let state = createDefaultPersistedState();
-    state = recordRecentIcon(state, icon(1), 100);
-    state = recordRecentIcon(state, icon(2), 200);
-
-    const parsed = parsePersistedState(
-      JSON.stringify({
-        ...state,
-        recentIcons: [...state.recentIcons].reverse(),
-      }),
-    );
-
-    expect(parsed.recentIcons.map((recent) => recent.openedAt)).toEqual([
-      200, 100,
-    ]);
   });
 
   it("round-trips through a storage-like boundary", () => {
@@ -148,21 +186,38 @@ describe("persistence", () => {
     );
   });
 
-  it("bounds and de-duplicates Recent icons newest-first", () => {
+  it("records real usage as Recent and frequency counts", () => {
     let state = createDefaultPersistedState();
     for (let index = 0; index < RECENT_ICON_LIMIT + 5; index += 1) {
-      state = recordRecentIcon(state, icon(index), index);
+      state = recordIconUsage(state, icon(index), index);
     }
 
     expect(state.recentIcons).toHaveLength(RECENT_ICON_LIMIT);
-    expect(state.recentIcons[0]?.openedAt).toBe(RECENT_ICON_LIMIT + 4);
+    expect(state.recentIcons[0]?.usedAt).toBe(RECENT_ICON_LIMIT + 4);
 
-    state = recordRecentIcon(state, icon(10), 999);
-    expect(state.recentIcons).toHaveLength(RECENT_ICON_LIMIT);
-    expect(state.recentIcons[0]?.openedAt).toBe(999);
+    state = recordIconUsage(state, icon(10), 999);
+    state = recordIconUsage(state, icon(10), 1000);
+    expect(state.recentIcons[0]?.usedAt).toBe(1000);
     expect(
       state.recentIcons.filter((recent) => recent.displayName === "Service 10"),
     ).toHaveLength(1);
+    expect(
+      state.iconUsage.find((usage) => usage.displayName === "Service 10")
+        ?.count,
+    ).toBe(3);
+  });
+
+  it("returns frequently used icons without changing search state", () => {
+    let state = createDefaultPersistedState();
+    state = recordIconUsage(state, icon(1), 100);
+    state = recordIconUsage(state, icon(2), 110);
+    state = recordIconUsage(state, icon(2), 120);
+
+    expect(
+      getFrequentlyUsedIcons(state, [icon(1), icon(2)]).map(
+        (entry) => entry.displayName,
+      ),
+    ).toEqual(["Service 2", "Service 1"]);
   });
 
   it("trims, case-folds, de-duplicates, and bounds Recent searches", () => {
@@ -181,13 +236,91 @@ describe("persistence", () => {
     expect(state.recentSearches[0]).toBe(`query ${RECENT_SEARCH_LIMIT + 2}`);
   });
 
-  it("keeps unmatched records while returning only current matched icons", () => {
+  it("creates, updates, deletes, and clipboard-round-trips Saved Sets", () => {
+    let state = createDefaultPersistedState();
+    state = createSavedSet(
+      state,
+      "  Web API  ",
+      [
+        { icon: icon(1), quantity: 2 },
+        { icon: icon(2), quantity: 1 },
+      ],
+      { id: "set-1", now: 100 },
+    );
+
+    const created = state.savedSets[0];
+    expect(created?.name).toBe("Web API");
+    expect(created?.items.map((item) => item.quantity)).toEqual([2, 1]);
+
+    state = updateSavedSet(
+      state,
+      "set-1",
+      "Updated",
+      [{ icon: icon(2), quantity: 3 }],
+      200,
+    );
+    expect(state.savedSets[0]?.name).toBe("Updated");
+    expect(state.savedSets[0]?.items[0]?.quantity).toBe(3);
+
+    const updatedSet = state.savedSets[0];
+    expect(updatedSet).toBeDefined();
+    if (!updatedSet) throw new Error("Expected updated Saved Set.");
+    const serialized = serializeSavedSet(updatedSet);
+    expect(parseSavedSetShare(serialized)?.name).toBe("Updated");
+    const imported = importSavedSet(state, serialized, {
+      id: "set-2",
+      now: 300,
+    });
+    expect(imported?.savedSets[0]?.id).toBe("set-2");
+    expect(importSavedSet(state, "not json")).toBeNull();
+    if (!imported) throw new Error("Expected imported Saved Set state.");
+
+    state = deleteSavedSet(imported, "set-1");
+    expect(state.savedSets.some((set) => set.id === "set-1")).toBe(false);
+  });
+
+  it("resolves valid Saved Set members while retaining unresolved metadata", () => {
+    let state = createDefaultPersistedState();
+    state = createSavedSet(
+      state,
+      "Mixed",
+      [
+        { icon: icon(1, "Old"), quantity: 2 },
+        { icon: icon(2, "Removed"), quantity: 1 },
+      ],
+      { id: "mixed", now: 10 },
+    );
+    const original = icon(1, "Old");
+    const moved: IconEntry = {
+      ...original,
+      id: "Azure_Public_Service_Icons/New/99999-icon-service-Service-1.svg",
+      originalPath:
+        "Azure_Public_Service_Icons/New/99999-icon-service-Service-1.svg",
+      originalFilename: "99999-icon-service-Service-1.svg",
+      categoryId: "Azure_Public_Service_Icons/New",
+      categoryPath: "New",
+    };
+
+    const savedSet = state.savedSets[0];
+    expect(savedSet).toBeDefined();
+    if (!savedSet) throw new Error("Expected Saved Set to resolve.");
+    const resolved = resolveSavedSet(savedSet, [moved]);
+    expect(resolved.matchedItems).toHaveLength(1);
+    expect(resolved.matchedItems[0]?.item.quantity).toBe(2);
+    expect(resolved.unresolvedItems).toHaveLength(1);
+  });
+
+  it("self-heals matched persisted identities without deleting unmatched records", () => {
     const old = icon(1, "Old");
     const missing = icon(2, "Removed");
     let state = createDefaultPersistedState();
     state = addFavorite(state, old, 10);
     state = addFavorite(state, missing, 20);
-    state = recordRecentIcon(state, old, 30);
+    state = recordIconUsage(state, old, 30);
+    state = createSavedSet(state, "Old set", [{ icon: old, quantity: 2 }], {
+      id: "set-old",
+      now: 40,
+    });
 
     const moved: IconEntry = {
       ...old,
@@ -204,12 +337,10 @@ describe("persistence", () => {
     expect(reconciled.changed).toBe(true);
     expect(reconciled.matchedFavorites).toHaveLength(1);
     expect(reconciled.matchedRecentIcons).toHaveLength(1);
+    expect(reconciled.matchedUsageIcons).toHaveLength(1);
     expect(reconciled.matchedFavorites[0]?.matchedBy).toBe("canonical-name");
     expect(reconciled.state.favorites).toHaveLength(2);
-    expect(reconciled.state.favorites[0]?.canonicalPath).toBe(
-      "Removed/10002-icon-service-Service-2.svg",
-    );
-    expect(reconciled.state.favorites[1]?.canonicalPath).toBe(
+    expect(reconciled.state.savedSets[0]?.items[0]?.canonicalPath).toBe(
       "New/99999-icon-service-Service-1.svg",
     );
   });

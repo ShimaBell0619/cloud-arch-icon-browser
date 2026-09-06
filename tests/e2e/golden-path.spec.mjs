@@ -187,6 +187,7 @@ test("favorites, recent icons, recent searches, and compact view survive package
   await appService.click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Add App Service to Tray" }).click();
 
   await navigation.getByRole("button", { name: "Recent" }).click();
   await expect(
@@ -230,6 +231,60 @@ test("favorites, recent icons, recent searches, and compact view survive package
   await reloadedNavigation.getByRole("button", { name: "Favorites" }).click();
   await expect(
     page.getByRole("button", { name: "Open App Service details, Compute" }),
+  ).toBeVisible();
+});
+
+test("Tray quick panel edits in place and Saved Sets persist with rename", async ({
+  page,
+}) => {
+  await loadPackage(page);
+
+  await page.getByRole("button", { name: "Add App Service to Tray" }).click();
+  await page
+    .getByRole("button", { name: "Open Tray panel, 1 objects" })
+    .click();
+  const quickTray = page.getByRole("dialog", { name: "Tray" });
+  await expect(quickTray).toBeVisible();
+  await expect(quickTray).toContainText("App Service");
+  await quickTray
+    .getByRole("button", { name: "Increase App Service quantity" })
+    .click();
+  await expect(quickTray).toContainText("2 total objects");
+  await quickTray.getByRole("button", { name: "View full Tray" }).click();
+  await expect(quickTray).not.toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Tray", exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Saved Set name" }).fill("Web API");
+  await page.getByRole("button", { name: "Save as Set" }).click();
+  await page.getByRole("button", { name: "Rename Saved Set Web API" }).click();
+  const rename = page.getByRole("textbox", {
+    name: "Rename Saved Set Web API",
+  });
+  await rename.fill("Web API renamed");
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(
+    page.getByText("Web API renamed", { exact: true }),
+  ).toBeVisible();
+  const contents = page.locator("details").filter({ hasText: "View contents" });
+  await contents.getByText("View contents", { exact: true }).click();
+  await expect(
+    contents.getByText("App Service", { exact: true }),
+  ).toBeVisible();
+  await expect(contents.getByText("×2", { exact: true })).toBeVisible();
+
+  await page.reload();
+  await page.getByLabel("Choose icon package ZIP").setInputFiles(fixture);
+  await page.getByRole("searchbox", { name: "Search icons" }).waitFor();
+  await page
+    .getByRole("button", { name: "Open Tray panel, 0 objects" })
+    .click();
+  const emptyQuickTray = page.getByRole("dialog", { name: "Tray" });
+  await expect(emptyQuickTray).toContainText("Tray is empty");
+  await emptyQuickTray.getByRole("button", { name: "View full Tray" }).click();
+  await expect(
+    page.getByText("Web API renamed", { exact: true }),
   ).toBeVisible();
 });
 

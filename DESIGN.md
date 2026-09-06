@@ -31,7 +31,7 @@ The following require an explicit design decision before implementation:
 - a supported hosted service, backend, database, account system, cloud sync, or telemetry,
 - automatic package download or runtime package/version checking,
 - persistence of the selected ZIP bytes, SVG bodies, generated image data, or package session outside the explicitly approved file-handle metadata boundary,
-- SVG editing or bulk operations,
+- SVG editing, diagram-canvas/project management, or Office multi-object bulk copy/export; Tray multi-select is an approved collection workflow,
 - raster file export beyond the transient clipboard PNG workflow,
 - PWA/service-worker behavior or a multi-page/router architecture,
 - additional distribution channels such as native apps, Homebrew, Chocolatey, winget, or Docker,
@@ -78,7 +78,7 @@ Prefer existing primitives and the simplest implementation consistent with this 
 
 ### Core/domain boundary
 
-Core package parsing, validation, path handling, display-name parsing, category construction, search ranking, persistence parsing/migration, and durable icon matching remain React-independent.
+Core package parsing, validation, path handling, display-name parsing, category construction, search ranking, persistence parsing/migration, durable icon matching, Tray operations, Saved Set validation/reconciliation, and usage aggregation remain React-independent.
 
 A runtime `IconPackageSession`-style object owns package-scoped resources such as the ZIP reader, entry metadata, search index, lazy extracted SVG Blobs, preview URLs, caches, and disposal. This object must not be stored in local persistence or a serializable shared store.
 
@@ -93,7 +93,7 @@ Derived search results should be computed from state/session inputs rather than 
 - Package replacement occurs only through the explicit `Change package` flow.
 - Validate a replacement candidate before swapping it into the active session.
 - Invalid replacement preserves the current session.
-- Successful replacement swaps sessions, then deterministically disposes the previous session and revokes its object URLs.
+- Successful replacement re-matches session Tray entries conservatively against the new package while preserving matched quantity/order and dropping unmatched active items with a notice; it then deterministically disposes the previous session and revokes its object URLs.
 
 ## 4. Persistence and durable icon identity
 
@@ -111,8 +111,10 @@ Approved persisted UI metadata:
 - view preference: `grid | compact`,
 - sidebar collapsed state,
 - Favorite icon references,
-- recently opened icon references,
-- recent search strings.
+- recently used icon references,
+- recent search strings,
+- user-defined Saved Sets containing durable icon references, quantity, order, name/id, and timestamps,
+- bounded local icon-usage counters/recency metadata used only for shortcuts.
 
 Never persist ZIP bytes, SVG/generated image bytes, Blob/Object URLs, readers, or package-session resources. `localStorage` never contains file handles.
 
@@ -127,9 +129,13 @@ Fuzzy similarity must never migrate persisted icon identity. Ambiguous/missing r
 
 History limits:
 
-- Recent icons: 50, newest first, de-duplicated by durable identity.
+- Recent icons: 50, newest first, de-duplicated by durable identity. Recent means meaningful use such as successful Copy or Tray add; merely opening details is not usage.
 - Recent searches: 10, trimmed and case-insensitively de-duplicated.
+- Usage-stat records: 200 maximum, locally derived and never used to change search ranking.
+- Saved Set names: 80 characters maximum; Saved Set icon members preserve durable identity, quantity, and order.
 - Favorites: no automatic count limit.
+
+Persistence schema v2 changes Recent from details-open history to recently-used history. Migration from v1 intentionally does not relabel old details-open records as usage; v1 Recent starts clean under v2 while Favorites/preferences/recent searches are preserved.
 
 ## 5. ZIP compatibility and icon model
 
@@ -187,7 +193,7 @@ Before loading, show a focused package picker/dropzone. When a remembered File S
 
 Desktop loaded layout:
 
-- collapsible left sidebar with `All icons`, `Favorites`, `Recent`, and `Categories`,
+- collapsible left sidebar with `All icons`, `Favorites`, `Recent`, `Tray`, and `Categories`,
 - search-first sticky toolbar,
 - Grid/Compact result presentation,
 - package metadata and `Change package` kept visually secondary.
@@ -204,13 +210,18 @@ Narrow/mobile layouts replace the desktop sidebar with a Drawer/Sheet and must a
 - Focused empty search may surface recent searches and matched Favorite shortcuts.
 - `/` focuses search when doing so does not interfere with an editable field or modal context.
 
-### Favorites, Recent, and views
+### Favorites, Recent, Tray, Saved Sets, and views
 
-- Favorites and recently opened icons use only the durable identity metadata described above.
-- Recent means recently opened icon details, not recent search strings.
+- Favorites are explicit user-curated single-icon shortcuts and use only durable identity metadata.
+- Recent means recently used icons, not details-open history or recent search strings. Successful Copy and Tray add record usage; opening details alone does not.
+- Frequently used shortcuts are computed from bounded local usage statistics and may appear on the empty/global All-icons surface. They never alter exact/prefix/substring/fuzzy search ranking.
+- There is exactly one active Tray. It is React session state, not persisted state: reload/restart clears it. Duplicate durable icons merge into one ordered row with quantity `×N`.
+- The sidebar opens the full Tray workspace. A continuously reachable `Tray N` affordance opens a lightweight quick panel so users can inspect/change quantity/remove items without leaving search results; dragging a card onto that affordance is an optional desktop convenience, never the only Add path.
+- Temporary Select mode collects multiple currently displayed icons into Tray and resets when the material result scope changes.
+- Saved Sets are user-defined reusable Tray combinations persisted as lightweight metadata only. They support create, rename, update, delete, inspect, `Add to Tray`, and `Replace Tray`; unresolved members stay stored and are reported rather than silently deleted.
+- Saved Set sharing uses an explicit versioned Clipboard text payload (`cloud-arch-icon-browser/saved-set`, schema version 1). Clipboard input is untrusted and must validate before import/application; no ZIP/SVG/generated bytes are included.
 - Grid is the default; Grid/Compact is persisted.
-- Card body opens details; Favorite is a separate accessible control.
-- `Copy` is the primary quick action, with touch/keyboard accessibility preserved.
+- Card body opens details; Favorite and Add-to-Tray are separate accessible controls. `Copy` remains the primary single-icon quick action.
 
 ### Details dialog and copy/download actions
 
