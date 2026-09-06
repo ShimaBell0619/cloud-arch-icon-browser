@@ -19,6 +19,15 @@ ICONS = [
     ("Dummy/Storage/12-icon-service-Storage-Account.svg", "#2563eb"),
 ]
 
+GENERATED_COLORS = (
+    "#2563eb",
+    "#7c3aed",
+    "#0ea5e9",
+    "#f59e0b",
+    "#16a34a",
+    "#0891b2",
+)
+
 
 def svg_bytes(color: str) -> bytes:
     source = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
@@ -29,15 +38,34 @@ def svg_bytes(color: str) -> bytes:
     return source.encode("utf-8")
 
 
+def icon_entries(count: int) -> list[tuple[str, str]]:
+    if count < len(ICONS):
+        raise ValueError(f"icon count must be at least {len(ICONS)}")
+    if count > 1000:
+        raise ValueError("icon count must not exceed 1000")
+
+    entries = list(ICONS)
+    for index in range(len(ICONS) + 1, count + 1):
+        color = GENERATED_COLORS[(index - 1) % len(GENERATED_COLORS)]
+        entries.append(
+            (
+                f"Dummy/Generated/{index}-icon-service-Synthetic-Preview-{index:03d}.svg",
+                color,
+            )
+        )
+    return entries
+
+
 def main() -> None:
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: create_fixture.py <output.zip>")
+    if len(sys.argv) not in (2, 3):
+        raise SystemExit("usage: create_fixture.py <output.zip> [icon-count]")
 
     output = Path(sys.argv[1])
+    count = int(sys.argv[2]) if len(sys.argv) == 3 else len(ICONS)
     output.parent.mkdir(parents=True, exist_ok=True)
 
     with ZipFile(output, "w", ZIP_DEFLATED) as archive:
-        for path, color in ICONS:
+        for path, color in icon_entries(count):
             archive.writestr(path, svg_bytes(color))
         archive.writestr(
             "readme.txt",
