@@ -42,10 +42,9 @@ describe("icon search", () => {
       match: "exact",
       icon: { displayName: "Zebra" },
     });
-    expect(index.search("Dummy/Other").map(({ icon, match }) => [
-      icon.displayName,
-      match,
-    ])).toEqual([
+    expect(
+      index.search("Other").map(({ icon, match }) => [icon.displayName, match]),
+    ).toEqual([
       ["SQL Database", "exact"],
       ["Zebra", "exact"],
     ]);

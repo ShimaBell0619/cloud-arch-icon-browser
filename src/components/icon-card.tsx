@@ -1,10 +1,6 @@
 import { CopyIcon, StarIcon } from "lucide-react";
 import { LazyIconPreview } from "@/components/lazy-icon-preview";
-import type {
-  IconEntry,
-  IconPackageSession,
-  ViewPreference,
-} from "@/core";
+import type { IconEntry, IconPackageSession, ViewPreference } from "@/core";
 
 interface IconCardProps {
   session: IconPackageSession;

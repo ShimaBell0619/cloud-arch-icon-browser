@@ -50,7 +50,11 @@ export async function renderSvgBlobToPng(
   const url = URL.createObjectURL(source);
   try {
     const image = await loadImage(url);
-    const rect = fitImageIntoSquare(image.naturalWidth, image.naturalHeight, size);
+    const rect = fitImageIntoSquare(
+      image.naturalWidth,
+      image.naturalHeight,
+      size,
+    );
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;

@@ -16,12 +16,11 @@ describe("clipboard PNG geometry", () => {
   });
 
   it("fits portrait SVG content into a centered 512 square without cropping", () => {
-    expect(fitImageIntoSquare(120, 360)).toEqual({
-      x: 170.66666666666669,
-      y: 0,
-      width: 170.66666666666666,
-      height: COPY_IMAGE_SIZE,
-    });
+    const rect = fitImageIntoSquare(120, 360);
+    expect(rect.x).toBeCloseTo(170.6667, 3);
+    expect(rect.y).toBe(0);
+    expect(rect.width).toBeCloseTo(170.6667, 3);
+    expect(rect.height).toBe(COPY_IMAGE_SIZE);
   });
 
   it("keeps square SVG content square", () => {

@@ -223,7 +223,10 @@ export function IconDetailsDialog({
               className={`mt-4 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm ${notice.kind === "error" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-border bg-muted/60 text-foreground"}`}
             >
               {notice.kind === "success" ? (
-                <CheckIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                <CheckIcon
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0"
+                />
               ) : null}
               <span>{notice.message}</span>
             </p>

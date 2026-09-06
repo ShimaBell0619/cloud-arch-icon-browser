@@ -1,10 +1,6 @@
 import { Clock3Icon, SearchIcon, StarIcon } from "lucide-react";
 import { LazyIconPreview } from "@/components/lazy-icon-preview";
-import type {
-  IconEntry,
-  IconPackageSession,
-  SearchMatch,
-} from "@/core";
+import type { IconEntry, IconPackageSession, SearchMatch } from "@/core";
 
 export type SearchAutocompleteItem =
   | {
@@ -42,10 +38,7 @@ export function SearchAutocomplete({
 
   return (
     <div className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-50 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg">
-      <div
-        id={id}
-        className="max-h-[min(26rem,55svh)] overflow-y-auto p-1.5"
-      >
+      <div id={id} className="max-h-[min(26rem,55svh)] overflow-y-auto p-1.5">
         {items.map((item, index) => {
           const active = index === activeIndex;
           return (
@@ -95,7 +88,8 @@ export function SearchAutocomplete({
                     </>
                   ) : (
                     <span className="truncate">
-                      {matchLabel(item.match)} · {item.icon.categoryPath || "Top level"}
+                      {matchLabel(item.match)} ·{" "}
+                      {item.icon.categoryPath || "Top level"}
                     </span>
                   )}
                 </span>

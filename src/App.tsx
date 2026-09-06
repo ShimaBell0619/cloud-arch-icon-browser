@@ -14,6 +14,7 @@ import {
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   RefreshCwIcon,
+  Rows3Icon,
   SearchIcon,
   StarIcon,
   SunIcon,
@@ -23,6 +24,7 @@ import {
 import {
   type ChangeEvent,
   type DragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -34,10 +36,15 @@ import {
 } from "react";
 import { AppErrorBoundary } from "@/components/app-error-boundary";
 import { CategoryTree } from "@/components/category-tree";
+import { IconCard } from "@/components/icon-card";
 import { IconDetailsDialog } from "@/components/icon-details-dialog";
-import { LazyIconPreview } from "@/components/lazy-icon-preview";
+import {
+  SearchAutocomplete,
+  type SearchAutocompleteItem,
+} from "@/components/search-autocomplete";
 import { Button } from "@/components/ui/button";
 import {
+  addFavorite,
   createDefaultPersistedState,
   type IconCategory,
   type IconEntry,
@@ -45,10 +52,16 @@ import {
   loadPersistedState,
   type PackageProblem,
   type PersistedPreferences,
+  type PersistedState,
+  reconcilePersistedStateWithIcons,
+  recordRecentIcon,
+  recordRecentSearch,
+  removeFavorite,
   savePersistedState,
   setPersistedPreferences,
   type ThemePreference,
 } from "@/core";
+import { clipboardErrorMessage, copyIconAsPng } from "@/lib/icon-clipboard";
 import { choosePackageFile } from "@/lib/package-file-picker";
 import { version } from "../package.json";
 
@@ -57,6 +70,9 @@ const SEARCH_DEBOUNCE_MS = 175;
 
 type LoadPhase = "reading" | "validating" | "indexing";
 type WorkspaceView = "all" | "favorites" | "recent";
+type PersistedStateUpdater = (
+  updater: (state: PersistedState) => PersistedState,
+) => void;
 
 interface LoadedPackage {
   session: IconPackageSession;
@@ -97,15 +113,21 @@ export function App() {
     };
   }, []);
 
+  const updatePersistedState = useCallback<PersistedStateUpdater>((updater) => {
+    setPersistedState((current) => {
+      const next = updater(current);
+      if (next !== current) persistStateQuietly(next);
+      return next;
+    });
+  }, []);
+
   const updatePreferences = useCallback(
     (preferences: Partial<PersistedPreferences>) => {
-      setPersistedState((current) => {
-        const next = setPersistedPreferences(current, preferences);
-        persistStateQuietly(next);
-        return next;
-      });
+      updatePersistedState((current) =>
+        setPersistedPreferences(current, preferences),
+      );
     },
-    [],
+    [updatePersistedState],
   );
 
   const resetWorkspace = useCallback(() => {
@@ -169,7 +191,9 @@ export function App() {
           loadedPackage={loadedPackage}
           loadPhase={loadPhase}
           loadError={loadError}
+          persistedState={persistedState}
           preferences={persistedState.preferences}
+          onPersistedStateChange={updatePersistedState}
           onPreferencesChange={updatePreferences}
           onReplace={(file) => void loadPackage(file)}
         />
@@ -353,7 +377,9 @@ interface LoadedWorkspaceProps {
   loadedPackage: LoadedPackage;
   loadPhase: LoadPhase | null;
   loadError: PackageProblem | null;
+  persistedState: PersistedState;
   preferences: PersistedPreferences;
+  onPersistedStateChange: PersistedStateUpdater;
   onPreferencesChange: (preferences: Partial<PersistedPreferences>) => void;
   onReplace: (file: File) => void;
 }
@@ -362,15 +388,19 @@ function LoadedWorkspace({
   loadedPackage,
   loadPhase,
   loadError,
+  persistedState,
   preferences,
+  onPersistedStateChange,
   onPreferencesChange,
   onReplace,
 }: LoadedWorkspaceProps) {
   const { session, filename } = loadedPackage;
-  const { categories, summary } = session.metadata;
+  const { categories, icons, summary } = session.metadata;
   const replacementInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const navigationButtonRef = useRef<HTMLButtonElement>(null);
+  const copyNoticeTimeoutRef = useRef<number | null>(null);
+  const searchListboxId = useId();
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("all");
@@ -382,11 +412,87 @@ function LoadedWorkspace({
   const [navigationSheetOpen, setNavigationSheetOpen] = useState(false);
   const [categoriesExpanded, setCategoriesExpanded] = useState(true);
   const [dropNotice, setDropNotice] = useState<string | null>(null);
+  const [autocompleteOpen, setAutocompleteOpen] = useState(false);
+  const [activeAutocompleteIndex, setActiveAutocompleteIndex] = useState(-1);
+  const [copyNotice, setCopyNotice] = useState<{
+    readonly kind: "success" | "error";
+    readonly message: string;
+  } | null>(null);
+
+  const reconciliation = useMemo(
+    () => reconcilePersistedStateWithIcons(persistedState, icons),
+    [icons, persistedState],
+  );
+
+  useEffect(() => {
+    if (!reconciliation.changed) return;
+    onPersistedStateChange(() => reconciliation.state);
+  }, [onPersistedStateChange, reconciliation]);
+
+  const favoriteIds = useMemo(
+    () => new Set(reconciliation.matchedFavorites.map(({ icon }) => icon.id)),
+    [reconciliation.matchedFavorites],
+  );
+  const favoriteIcons = useMemo(
+    () => reconciliation.matchedFavorites.map(({ icon }) => icon),
+    [reconciliation.matchedFavorites],
+  );
+  const recentIcons = useMemo(
+    () => reconciliation.matchedRecentIcons.map(({ icon }) => icon),
+    [reconciliation.matchedRecentIcons],
+  );
 
   const results = useMemo(
     () => session.search(debouncedQuery, selectedCategory),
     [debouncedQuery, selectedCategory, session],
   );
+
+  const autocompleteItems = useMemo<readonly SearchAutocompleteItem[]>(() => {
+    const trimmed = query.trim();
+    if (trimmed) {
+      return session
+        .search(query, selectedCategory)
+        .filter(({ match }) => match !== "all")
+        .slice(0, 8)
+        .map(({ icon, match }) => ({ kind: "icon" as const, icon, match }));
+    }
+
+    return [
+      ...persistedState.recentSearches.slice(0, 5).map((recentQuery) => ({
+        kind: "recent-search" as const,
+        query: recentQuery,
+      })),
+      ...favoriteIcons.slice(0, 5).map((icon) => ({
+        kind: "favorite" as const,
+        icon,
+      })),
+    ];
+  }, [
+    favoriteIcons,
+    persistedState.recentSearches,
+    query,
+    selectedCategory,
+    session,
+  ]);
+
+  const selectedCategoryPath = useMemo(
+    () => findCategoryPath(categories, selectedCategory),
+    [categories, selectedCategory],
+  );
+
+  const visibleIcons = useMemo(() => {
+    if (workspaceView === "favorites") return favoriteIcons;
+    if (workspaceView === "recent") return recentIcons;
+    return results.map(({ icon }) => icon);
+  }, [favoriteIcons, recentIcons, results, workspaceView]);
+
+  useEffect(() => {
+    return () => {
+      if (copyNoticeTimeoutRef.current !== null) {
+        window.clearTimeout(copyNoticeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleSlash = (event: KeyboardEvent) => {
@@ -404,6 +510,7 @@ function LoadedWorkspace({
       if (document.querySelector("dialog[open]")) return;
       event.preventDefault();
       searchRef.current?.focus();
+      setAutocompleteOpen(true);
     };
 
     window.addEventListener("keydown", handleSlash);
@@ -455,11 +562,15 @@ function LoadedWorkspace({
   const showFavorites = () => {
     setWorkspaceView("favorites");
     setSelectedCategory(null);
+    setQuery("");
+    setAutocompleteOpen(false);
   };
 
   const showRecent = () => {
     setWorkspaceView("recent");
     setSelectedCategory(null);
+    setQuery("");
+    setAutocompleteOpen(false);
   };
 
   const selectCategory = (categoryId: string | null) => {
@@ -477,16 +588,124 @@ function LoadedWorkspace({
   };
 
   const clearSearch = () => {
+    setWorkspaceView("all");
     setQuery("");
+    setActiveAutocompleteIndex(-1);
+    setAutocompleteOpen(true);
     searchRef.current?.focus();
   };
 
-  const statusText =
-    workspaceView === "all"
-      ? `${results.length} ${results.length === 1 ? "icon" : "icons"}`
-      : workspaceView === "favorites"
-        ? "Favorites view"
-        : "Recent view";
+  const openDetails = (icon: IconEntry, trigger: HTMLElement | null) => {
+    setDetailsTrigger(trigger);
+    setSelectedIcon(icon);
+    onPersistedStateChange((state) => recordRecentIcon(state, icon));
+  };
+
+  const toggleFavorite = (icon: IconEntry) => {
+    onPersistedStateChange((state) =>
+      favoriteIds.has(icon.id)
+        ? removeFavorite(state, icon)
+        : addFavorite(state, icon),
+    );
+  };
+
+  const showCopyFeedback = useCallback(
+    (next: {
+      readonly kind: "success" | "error";
+      readonly message: string;
+    }) => {
+      if (copyNoticeTimeoutRef.current !== null) {
+        window.clearTimeout(copyNoticeTimeoutRef.current);
+      }
+      setCopyNotice(next);
+      copyNoticeTimeoutRef.current = window.setTimeout(() => {
+        setCopyNotice(null);
+        copyNoticeTimeoutRef.current = null;
+      }, 2600);
+    },
+    [],
+  );
+
+  const copyQuick = async (icon: IconEntry) => {
+    try {
+      await copyIconAsPng(session, icon);
+      showCopyFeedback({
+        kind: "success",
+        message: `Copied ${icon.displayName} as a 512×512 PNG.`,
+      });
+    } catch (error) {
+      showCopyFeedback({
+        kind: "error",
+        message: clipboardErrorMessage(error),
+      });
+    }
+  };
+
+  const selectAutocompleteItem = (item: SearchAutocompleteItem) => {
+    setActiveAutocompleteIndex(-1);
+    setAutocompleteOpen(false);
+    if (item.kind === "recent-search") {
+      setWorkspaceView("all");
+      setQuery(item.query);
+      onPersistedStateChange((state) => recordRecentSearch(state, item.query));
+      return;
+    }
+
+    if (query.trim()) {
+      onPersistedStateChange((state) => recordRecentSearch(state, query));
+    }
+    openDetails(item.icon, searchRef.current);
+  };
+
+  const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (autocompleteItems.length === 0) return;
+      event.preventDefault();
+      setAutocompleteOpen(true);
+      setActiveAutocompleteIndex((current) => {
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        const start = current < 0 ? (direction > 0 ? -1 : 0) : current;
+        return (
+          (start + direction + autocompleteItems.length) %
+          autocompleteItems.length
+        );
+      });
+      return;
+    }
+
+    if (event.key === "Escape") {
+      if (!autocompleteOpen) return;
+      event.preventDefault();
+      setAutocompleteOpen(false);
+      setActiveAutocompleteIndex(-1);
+      return;
+    }
+
+    if (event.key === "Enter") {
+      const active = autocompleteItems[activeAutocompleteIndex];
+      if (autocompleteOpen && active) {
+        event.preventDefault();
+        selectAutocompleteItem(active);
+        return;
+      }
+      if (query.trim()) {
+        onPersistedStateChange((state) => recordRecentSearch(state, query));
+        setAutocompleteOpen(false);
+      }
+    }
+  };
+
+  const statusText = `${visibleIcons.length} ${visibleIcons.length === 1 ? "icon" : "icons"}`;
+  const emptyCollection =
+    workspaceView === "favorites"
+      ? {
+          title: "No favorites yet",
+          body: "Use the star on an icon card or in icon details to keep it here.",
+        }
+      : {
+          title: "No recent icons yet",
+          body: "Icons you open are kept here locally for quick access.",
+        };
 
   return (
     <div className="min-h-svh bg-background">
@@ -553,7 +772,18 @@ function LoadedWorkspace({
                 aria-label="Search icons"
                 placeholder="Search icons by name, filename, or category"
                 className="h-11 w-full rounded-2xl border border-input bg-card pl-10 pr-16 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-                onChange={(event) => setQuery(event.currentTarget.value)}
+                onFocus={() => {
+                  setAutocompleteOpen(true);
+                  setActiveAutocompleteIndex(-1);
+                }}
+                onBlur={() => setAutocompleteOpen(false)}
+                onKeyDown={handleSearchKeyDown}
+                onChange={(event) => {
+                  setWorkspaceView("all");
+                  setQuery(event.currentTarget.value);
+                  setActiveAutocompleteIndex(-1);
+                  setAutocompleteOpen(true);
+                }}
               />
               {query ? (
                 <button
@@ -569,6 +799,14 @@ function LoadedWorkspace({
                   /
                 </kbd>
               )}
+              <SearchAutocomplete
+                id={searchListboxId}
+                open={autocompleteOpen}
+                session={session}
+                items={autocompleteItems}
+                activeIndex={activeAutocompleteIndex}
+                onSelect={selectAutocompleteItem}
+              />
             </div>
 
             <span
@@ -578,7 +816,50 @@ function LoadedWorkspace({
             >
               {statusText}
             </span>
+
+            <fieldset className="flex shrink-0 items-center rounded-xl border border-border bg-card p-1">
+              <legend className="sr-only">Icon view</legend>
+              <button
+                type="button"
+                aria-label="Grid view"
+                aria-pressed={preferences.view === "grid"}
+                title="Grid view"
+                className={`flex size-8 items-center justify-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30 ${preferences.view === "grid" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                onClick={() => onPreferencesChange({ view: "grid" })}
+              >
+                <LayoutGridIcon aria-hidden="true" className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label="Compact view"
+                aria-pressed={preferences.view === "compact"}
+                title="Compact view"
+                className={`flex size-8 items-center justify-center rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/30 ${preferences.view === "compact" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                onClick={() => onPreferencesChange({ view: "compact" })}
+              >
+                <Rows3Icon aria-hidden="true" className="size-4" />
+              </button>
+            </fieldset>
           </div>
+
+          {selectedCategory && selectedCategoryPath ? (
+            <div className="flex items-center gap-2 border-t border-border/70 px-3 py-2 sm:px-4 lg:px-5">
+              <span className="text-xs text-muted-foreground">
+                Active filter
+              </span>
+              <button
+                type="button"
+                aria-label={`Remove category filter ${selectedCategoryPath}`}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30"
+                onClick={() => setSelectedCategory(null)}
+              >
+                <span className="truncate">
+                  Category: {selectedCategoryPath}
+                </span>
+                <XIcon aria-hidden="true" className="size-3" />
+              </button>
+            </div>
+          ) : null}
         </header>
 
         <main className="p-3 sm:p-4 lg:p-5">
@@ -606,32 +887,49 @@ function LoadedWorkspace({
             </div>
           ) : null}
 
-          {workspaceView === "favorites" ? (
-            <WorkspacePlaceholder view="favorites" />
-          ) : workspaceView === "recent" ? (
-            <WorkspacePlaceholder view="recent" />
-          ) : results.length ? (
-            <section aria-label="Icon results">
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
-                {results.map(({ icon }) => (
+          {visibleIcons.length ? (
+            <section
+              aria-label={
+                workspaceView === "all"
+                  ? "Icon results"
+                  : workspaceView === "favorites"
+                    ? "Favorite icons"
+                    : "Recent icons"
+              }
+            >
+              <div
+                className={
+                  preferences.view === "grid"
+                    ? "grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3"
+                    : "grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-2"
+                }
+              >
+                {visibleIcons.map((icon) => (
                   <IconCard
                     key={icon.id}
                     session={session}
                     icon={icon}
-                    onOpen={(trigger) => {
-                      setDetailsTrigger(trigger);
-                      setSelectedIcon(icon);
-                    }}
+                    view={preferences.view}
+                    favorite={favoriteIds.has(icon.id)}
+                    onOpen={(trigger) => openDetails(icon, trigger)}
+                    onToggleFavorite={() => toggleFavorite(icon)}
+                    onCopy={() => void copyQuick(icon)}
                   />
                 ))}
               </div>
             </section>
-          ) : (
+          ) : workspaceView === "all" ? (
             <EmptyResults
               query={query}
               selectedCategory={selectedCategory}
               onClearSearch={clearSearch}
               onSearchAll={showAllIcons}
+            />
+          ) : (
+            <EmptyCollection
+              icon={workspaceView === "favorites" ? "favorites" : "recent"}
+              title={emptyCollection.title}
+              body={emptyCollection.body}
             />
           )}
         </main>
@@ -661,8 +959,21 @@ function LoadedWorkspace({
         session={session}
         icon={selectedIcon}
         restoreFocusTo={detailsTrigger}
+        favorite={selectedIcon ? favoriteIds.has(selectedIcon.id) : false}
+        onToggleFavorite={() => {
+          if (selectedIcon) toggleFavorite(selectedIcon);
+        }}
         onClose={() => setSelectedIcon(null)}
       />
+
+      {copyNotice ? (
+        <div
+          role={copyNotice.kind === "error" ? "alert" : "status"}
+          className={`fixed bottom-4 left-4 right-4 z-[70] rounded-xl border px-3 py-2 text-sm shadow-lg sm:left-auto sm:max-w-sm ${copyNotice.kind === "error" ? "border-destructive/30 bg-card text-destructive" : "border-border bg-popover text-popover-foreground"}`}
+        >
+          {copyNotice.message}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1177,70 +1488,24 @@ function ThemeControl({
   );
 }
 
-function WorkspacePlaceholder({
-  view,
+function EmptyCollection({
+  icon,
+  title,
+  body,
 }: {
-  view: Exclude<WorkspaceView, "all">;
+  icon: "favorites" | "recent";
+  title: string;
+  body: string;
 }) {
-  const favorites = view === "favorites";
-  const Icon = favorites ? StarIcon : Clock3Icon;
-
+  const Icon = icon === "favorites" ? StarIcon : Clock3Icon;
   return (
-    <section
-      aria-labelledby={`${view}-heading`}
-      className="mx-auto mt-12 max-w-md rounded-2xl border border-border bg-card p-6 text-center"
-    >
+    <section className="mx-auto mt-12 max-w-md rounded-2xl border border-border bg-card p-6 text-center">
       <div className="mx-auto flex size-11 items-center justify-center rounded-xl bg-accent text-accent-foreground">
         <Icon aria-hidden="true" className="size-4" />
       </div>
-      <h2 id={`${view}-heading`} className="mt-3 text-sm font-semibold">
-        {favorites ? "Favorites" : "Recent"}
-      </h2>
-      <p className="mt-1 text-sm leading-6 text-muted-foreground">
-        {favorites
-          ? "Favorite icon actions and saved results will appear here in the next v0.2.0 step."
-          : "Recently opened icons will appear here once the v0.2.0 history experience is connected."}
-      </p>
+      <h2 className="mt-3 text-sm font-semibold">{title}</h2>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">{body}</p>
     </section>
-  );
-}
-
-interface IconCardProps {
-  session: IconPackageSession;
-  icon: IconEntry;
-  onOpen: (trigger: HTMLElement) => void;
-}
-
-function IconCard({ session, icon, onOpen }: IconCardProps) {
-  const tooltipId = useId();
-  const category = icon.categoryPath || "Top level";
-
-  return (
-    <button
-      type="button"
-      aria-label={`${icon.displayName}, ${category}`}
-      aria-describedby={tooltipId}
-      className="group relative flex h-44 min-w-0 flex-col items-center gap-3 rounded-2xl border border-border bg-card p-3 text-center outline-none transition-colors hover:border-input hover:bg-muted/30 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
-      onClick={(event) => onOpen(event.currentTarget)}
-    >
-      <LazyIconPreview session={session} icon={icon} />
-      <div className="min-w-0 w-full">
-        <p className="line-clamp-2 text-sm font-medium leading-5">
-          {icon.displayName}
-        </p>
-        <p className="mt-1 truncate text-xs text-muted-foreground">
-          {category}
-        </p>
-      </div>
-      <span
-        id={tooltipId}
-        role="tooltip"
-        className="pointer-events-none absolute bottom-2 left-1/2 z-10 w-max max-w-[calc(100%-1rem)] -translate-x-1/2 rounded-lg border border-border bg-popover px-2 py-1 text-left text-xs text-popover-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-      >
-        <span className="block font-medium">{icon.displayName}</span>
-        <span className="block truncate text-muted-foreground">{category}</span>
-      </span>
-    </button>
   );
 }
 
@@ -1280,6 +1545,21 @@ function EmptyResults({
       </div>
     </section>
   );
+}
+
+function findCategoryPath(
+  categories: readonly IconCategory[],
+  categoryId: string | null,
+): string | null {
+  if (!categoryId) return null;
+  const pending = [...categories];
+  while (pending.length) {
+    const category = pending.shift();
+    if (!category) continue;
+    if (category.id === categoryId) return category.path;
+    pending.push(...category.children);
+  }
+  return null;
 }
 
 function PackageErrorNotice({
@@ -1370,9 +1650,7 @@ function readInitialPersistedState() {
   }
 }
 
-function persistStateQuietly(
-  state: ReturnType<typeof createDefaultPersistedState>,
-): void {
+function persistStateQuietly(state: PersistedState): void {
   try {
     savePersistedState(window.localStorage, state);
   } catch {
