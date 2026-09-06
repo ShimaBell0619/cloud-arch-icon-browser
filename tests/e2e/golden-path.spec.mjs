@@ -13,7 +13,9 @@ async function loadPackage(page) {
   await page.goto("/");
   await page.getByLabel("Choose icon package ZIP").setInputFiles(fixture);
   await page.getByRole("searchbox", { name: "Search icons" }).waitFor();
-  await expect(resultStatus(page)).toContainText("12 icons");
+  await expect(
+    page.getByRole("button", { name: "Open App Service details, Compute" }),
+  ).toBeVisible();
 }
 
 async function expectNoAxeViolations(page) {
@@ -35,6 +37,60 @@ async function expectNoAxeViolations(page) {
       )
       .join("\n\n"),
   ).toEqual([]);
+}
+
+async function installClipboardImageProbe(page) {
+  await page.addInitScript(() => {
+    class TestClipboardItem {
+      constructor(items) {
+        this.items = items;
+        this.types = Object.keys(items);
+      }
+    }
+
+    Object.defineProperty(window, "ClipboardItem", {
+      configurable: true,
+      writable: true,
+      value: TestClipboardItem,
+    });
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        async write(items) {
+          const item = items[0];
+          const source = item?.items?.["image/png"];
+          const blob = await source;
+          const bitmap = await createImageBitmap(blob);
+          const canvas = document.createElement("canvas");
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const context = canvas.getContext("2d", { willReadFrequently: true });
+          if (!context) throw new Error("Clipboard probe canvas unavailable");
+          context.drawImage(bitmap, 0, 0);
+          const cornerAlpha = context.getImageData(0, 0, 1, 1).data[3];
+          const centerAlpha = context.getImageData(
+            Math.floor(bitmap.width / 2),
+            Math.floor(bitmap.height / 2),
+            1,
+            1,
+          ).data[3];
+          window.__clipboardImageProbe = {
+            types: item.types,
+            blobType: blob.type,
+            width: bitmap.width,
+            height: bitmap.height,
+            cornerAlpha,
+            centerAlpha,
+          };
+          bitmap.close();
+        },
+        async writeText(text) {
+          window.__clipboardText = text;
+        },
+      },
+    });
+  });
 }
 
 test("searches with explicit category scope, keyboard autocomplete, and downloads original SVG bytes", async ({
@@ -209,6 +265,91 @@ test("workspace navigation and theme preferences survive reload without reopenin
   await expect(
     page.getByRole("button", { name: "Expand sidebar" }),
   ).toBeVisible();
+});
+
+test("copy image writes a transparent 512x512 PNG and reports clipboard denial", async ({
+  page,
+}) => {
+  await installClipboardImageProbe(page);
+  await loadPackage(page);
+
+  await page
+    .getByRole("button", { name: "Open App Service details, Compute" })
+    .click();
+  const dialog = page.getByRole("dialog");
+  const copyImage = dialog.getByRole("button", { name: "Copy image" });
+
+  await copyImage.click();
+  await expect(dialog.getByRole("status")).toContainText(
+    "Copied 512×512 PNG image.",
+  );
+
+  const probe = await page.evaluate(() => window.__clipboardImageProbe);
+  expect(probe).toMatchObject({
+    types: ["image/png"],
+    blobType: "image/png",
+    width: 512,
+    height: 512,
+    cornerAlpha: 0,
+  });
+  expect(probe.centerAlpha).toBeGreaterThan(0);
+
+  await page.evaluate(() => {
+    navigator.clipboard.write = async () => {
+      throw new DOMException("Denied for test", "NotAllowedError");
+    };
+  });
+  await copyImage.click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Clipboard access was denied",
+  );
+});
+
+test("narrow mobile navigation and dialog stay usable without horizontal overflow", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loadPackage(page);
+
+  await expect(
+    page.getByRole("button", { name: "Open navigation" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  const navigationDialog = page.getByRole("dialog", { name: "Navigation" });
+  await expect(navigationDialog).toBeVisible();
+  await expect(
+    navigationDialog.getByRole("button", { name: "Favorites" }),
+  ).toBeVisible();
+  await expect(
+    navigationDialog.getByRole("button", { name: "Dark theme" }),
+  ).toBeVisible();
+  await expectNoAxeViolations(page);
+  await page.keyboard.press("Escape");
+  await expect(navigationDialog).not.toBeVisible();
+
+  await page
+    .getByRole("button", { name: "Open App Service details, Compute" })
+    .click();
+  const detailsDialog = page.getByRole("dialog");
+  await expect(detailsDialog).toBeVisible();
+  const box = await detailsDialog.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  expect(box.y + box.height).toBeLessThanOrEqual(844);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await expectNoAxeViolations(page);
 });
 
 test("key screens have no automatically detectable WCAG A/AA violations", async ({

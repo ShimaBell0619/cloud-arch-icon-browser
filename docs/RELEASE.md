@@ -2,9 +2,11 @@
 
 This project uses Changesets for release intent and GitHub Actions for publication. Normal publication uses npm Trusted Publishing (OIDC); no long-lived npm publish token belongs in this repository.
 
-## Current release state
+## Release state
 
-The first public release, `v0.1.0`, was published on 2026-09-06 (JST).
+Published release state is determined by the npm registry, `package.json`, immutable Git tags, GitHub Releases, and `CHANGELOG.md`. This runbook intentionally does not duplicate a hard-coded "current version" that can become stale between release steps.
+
+The first public release was `v0.1.0`, published on 2026-09-06 (JST).
 
 Package:
 
@@ -23,6 +25,8 @@ Current publication contract:
 
 The current official `Azure_Public_Service_Icons_V24.zip` has passed the production-parser verification recorded in [`COMPATIBILITY.md`](../COMPATIBILITY.md).
 
+Release-specific verification records may live under `docs/`; the `v0.2.0` record is [`V0.2.0_VERIFICATION.md`](./V0.2.0_VERIFICATION.md).
+
 ## Normal release flow
 
 For a user-visible or package-relevant change:
@@ -36,11 +40,38 @@ For a user-visible or package-relevant change:
 2. Select the SemVer bump and describe the release-facing change.
 3. Merge the PR to `main` after required CI passes.
 4. `.github/workflows/release-pr.yml` aggregates pending Changesets into the `chore: release packages` PR.
-5. Review and merge that release PR.
+5. Review release-specific gates and then merge that release PR only after explicit maintainer approval.
 6. The resulting `package.json` / `package-lock.json` / `CHANGELOG.md` change triggers `.github/workflows/release.yml`.
-7. Verify the published npm version and provenance, immutable `vX.Y.Z` tag, and matching GitHub Release.
+7. Verify the published npm version and provenance, immutable `vX.Y.Z` tag, matching GitHub Release, and actual tarball installability.
 
 Docs-only or internal changes that do not alter packaged/user-visible release content normally do not require a Changeset.
+
+### Release PR creation fallback
+
+The Changesets action can generate/update `changeset-release/main` even when repository-level GitHub Actions settings prohibit Actions from opening a pull request. The characteristic error is:
+
+```text
+GitHub Actions is not permitted to create or approve pull requests.
+```
+
+If this occurs:
+
+1. Confirm the Changesets job successfully generated `changeset-release/main` before the PR-creation failure.
+2. Compare `changeset-release/main` against `main` and verify that the version, generated `CHANGELOG.md`, lockfile, and consumed Changesets are exactly the expected release output.
+3. Open `changeset-release/main` → `main` manually as `chore: release packages` without regenerating or editing the generated release content.
+4. Keep the same release-specific acceptance gates and explicit maintainer-approval requirement before merge.
+
+For future fully automatic Release PR creation, a repository maintainer may enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**. The workflow already requests `contents: write` and `pull-requests: write`; the repository-level switch is independent of those YAML permissions.
+
+This PR-creation setting does not alter npm Trusted Publishing/OIDC. Publication is still handled separately by `release.yml` after the release PR is merged.
+
+## Release-specific product gates
+
+A Changesets Release PR is not sufficient evidence by itself that a feature release is ready. When an Epic or release-polish Issue defines additional acceptance criteria, those gates must be recorded before the release PR is merged.
+
+For `v0.2.0`, [`V0.2.0_VERIFICATION.md`](./V0.2.0_VERIFICATION.md) is the release-specific record. In particular, Windows PowerPoint and Excel paste verification for the transparent 512×512 **Copy image** workflow is a manual release blocker and must be completed before the `v0.2.0` Changesets Release PR is merged.
+
+The repository-wide rule remains: release PR merge requires explicit maintainer instruction; do not enable or perform automatic merge merely because CI is green.
 
 ## Trusted Publishing contract
 
@@ -125,6 +156,8 @@ Before a release that claims compatibility with a newer current Microsoft packag
 
 4. Update `COMPATIBILITY.md` only after successful production-parser verification.
 5. Ensure `Release gate: PASS` accurately reflects the current recorded package before release.
+
+If the official package identity is unchanged from a successful verification already recorded for the same release-maintenance window, a duplicate download/re-run is not required. Re-verify if the package identity/link or relevant Microsoft guidance changes before publication.
 
 The verifier reuses the production `IconPackageSession.open` parser/validator. The official package itself remains outside the repository and npm artifact.
 
