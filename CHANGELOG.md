@@ -1,5 +1,17 @@
 # @shimabell06/cloud-arch-icon-browser
 
+## 0.3.0
+
+### Minor Changes
+
+- 46753f3: Add an Experimental Windows PowerPoint Copy all workflow for Tray items through a capability-scoped localhost bridge, with bounded transient PNG handling and perceived-size normalization. Physical Windows/PowerPoint paste validation remains tracked by #57 and is not yet a formal compatibility claim.
+- 9aeba15: Use a stable canonical localhost origin for packaged runs, reuse an already-running matching local instance, and let supported browsers reopen a previously validated local ZIP through a persisted File System Access handle without storing package bytes.
+- 2e1045e: Add a session-only Tray with quantity/order controls, multi-select and drag collection, reusable locally persisted Saved Sets, recently-used history, and frequently-used shortcuts.
+
+### Patch Changes
+
+- 2666a3e: Reduce initial and scroll-time icon preview latency with shared prefetch observation and bounded viewport-prioritized preview work.
+
 ## 0.2.1
 
 ### Patch Changes
