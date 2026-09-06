@@ -37,6 +37,19 @@ describe("icon search", () => {
     ]);
   });
 
+  it("uses deterministic tiers for original filename and category path", () => {
+    expect(index.search("5-icon-service-Zebra.svg")[0]).toMatchObject({
+      match: "exact",
+      icon: { displayName: "Zebra" },
+    });
+    expect(
+      index.search("Other").map(({ icon, match }) => [icon.displayName, match]),
+    ).toEqual([
+      ["SQL Database", "exact"],
+      ["Zebra", "exact"],
+    ]);
+  });
+
   it("uses weighted Fuse matches for typos, filename and category fields", () => {
     expect(index.search("apservce")[0]).toMatchObject({
       match: "fuzzy",

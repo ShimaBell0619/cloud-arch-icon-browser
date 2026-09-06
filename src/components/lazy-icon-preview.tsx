@@ -7,6 +7,7 @@ interface LazyIconPreviewProps {
   icon: IconEntry;
   eager?: boolean;
   large?: boolean;
+  small?: boolean;
 }
 
 type PreviewState =
@@ -19,6 +20,7 @@ export function LazyIconPreview({
   icon,
   eager = false,
   large = false,
+  small = false,
 }: LazyIconPreviewProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<PreviewState>({
@@ -65,31 +67,34 @@ export function LazyIconPreview({
     };
   }, [eager, icon.id, session]);
 
+  const hostSize = large ? "h-48 w-full" : small ? "size-10" : "size-20";
+  const contentSize = large ? "size-32" : small ? "size-7" : "size-16";
+
   return (
     <div
       ref={hostRef}
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-preview-border bg-preview ${large ? "h-48 w-full" : "size-20"}`}
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-preview-border bg-preview ${hostSize}`}
     >
       {preview.status === "ready" ? (
         <img
           src={preview.url}
           alt={`${icon.displayName} preview`}
-          className={
-            large ? "size-32 object-contain" : "size-16 object-contain"
-          }
+          className={`${contentSize} object-contain`}
           draggable={false}
           loading={eager ? "eager" : "lazy"}
         />
       ) : preview.status === "error" ? (
         <div className="flex flex-col items-center gap-1 text-preview-muted">
-          <ImageOffIcon aria-hidden="true" className="size-5" />
-          <span className="text-[10px] font-medium">Preview unavailable</span>
+          <ImageOffIcon aria-hidden="true" className="size-4" />
+          {!small ? (
+            <span className="text-[10px] font-medium">Preview unavailable</span>
+          ) : null}
         </div>
       ) : (
         <div
           aria-label={`Loading ${icon.displayName} preview`}
           role="status"
-          className={`${large ? "size-32" : "size-16"} animate-pulse rounded-lg bg-preview-skeleton`}
+          className={`${contentSize} animate-pulse rounded-lg bg-preview-skeleton`}
         />
       )}
     </div>

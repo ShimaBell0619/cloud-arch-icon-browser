@@ -37,7 +37,7 @@ async function expectNoAxeViolations(page) {
   ).toEqual([]);
 }
 
-test("loads a local package, browses, searches, opens details, and downloads original SVG bytes", async ({
+test("searches with explicit category scope, keyboard autocomplete, and downloads original SVG bytes", async ({
   page,
 }) => {
   await loadPackage(page);
@@ -45,6 +45,9 @@ test("loads a local package, browses, searches, opens details, and downloads ori
   const search = page.getByRole("searchbox", { name: "Search icons" });
   await page.getByRole("button", { name: "Compute, 4 icons" }).click();
   await expect(resultStatus(page)).toContainText("4 icons");
+  await expect(
+    page.getByRole("button", { name: "Remove category filter Compute" }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Change package" }).focus();
   await page.keyboard.press("/");
@@ -53,27 +56,42 @@ test("loads a local package, browses, searches, opens details, and downloads ori
   await search.fill("functions");
   await expect(resultStatus(page)).toContainText("1 icon");
   await expect(
-    page.getByRole("button", { name: "Functions, Compute" }),
+    page.getByRole("button", { name: "Open Functions details, Compute" }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Clear search" }).click();
+  await page
+    .getByRole("button", { name: "Remove category filter Compute" })
+    .click();
+  await expect(search).toHaveValue("functions");
+  await expect(resultStatus(page)).toContainText("1 icon");
+
+  await search.press("ArrowDown");
+  await search.press("Enter");
+  const functionsDialog = page.getByRole("dialog");
+  await expect(functionsDialog).toBeVisible();
+  await expect(
+    functionsDialog.getByRole("heading", { name: "Functions" }),
+  ).toBeVisible();
+  await expect(
+    functionsDialog.getByRole("button", { name: "Copy image" }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(functionsDialog).not.toBeVisible();
   await expect(search).toBeFocused();
-  await expect(resultStatus(page)).toContainText("4 icons");
+
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(resultStatus(page)).toContainText("12 icons");
 
   const appService = page.getByRole("button", {
-    name: "App Service, Compute",
+    name: "Open App Service details, Compute",
   });
-  await appService.focus();
-  await page.keyboard.press("Enter");
+  await appService.click();
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(
     dialog.getByRole("heading", { name: "App Service" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Close icon details" }),
-  ).toBeFocused();
 
   const downloadPromise = page.waitForEvent("download");
   await dialog.getByRole("button", { name: "Download SVG" }).click();
@@ -91,7 +109,75 @@ test("loads a local package, browses, searches, opens details, and downloads ori
   await expect(appService).toBeFocused();
 });
 
-test("workspace navigation preferences survive reload without reopening the package", async ({
+test("favorites, recent icons, recent searches, and compact view survive package reload", async ({
+  page,
+}) => {
+  await loadPackage(page);
+
+  const navigation = page.getByRole("navigation", { name: "Workspace" });
+  const appService = page.getByRole("button", {
+    name: "Open App Service details, Compute",
+  });
+
+  await page
+    .getByRole("button", { name: "Add App Service to favorites" })
+    .click();
+  await navigation.getByRole("button", { name: "Favorites" }).click();
+  await expect(
+    page.getByRole("button", { name: "Open App Service details, Compute" }),
+  ).toBeVisible();
+
+  await navigation.getByRole("button", { name: "All icons" }).click();
+  await appService.click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await navigation.getByRole("button", { name: "Recent" }).click();
+  await expect(
+    page.getByRole("button", { name: "Open App Service details, Compute" }),
+  ).toBeVisible();
+
+  await navigation.getByRole("button", { name: "All icons" }).click();
+  const search = page.getByRole("searchbox", { name: "Search icons" });
+  await search.fill("functions");
+  await search.press("Enter");
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(
+    page.getByRole("button", { name: /functions.*Recent search/i }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Compact view" }).click();
+  await expect(
+    page.getByRole("button", { name: "Compact view" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  const persisted = await page.evaluate(() => {
+    const raw = localStorage.getItem("cloud-arch-icon-browser:state");
+    return raw ? JSON.parse(raw) : null;
+  });
+  expect(persisted.preferences).toMatchObject({ view: "compact" });
+  expect(persisted.favorites).toHaveLength(1);
+  expect(persisted.recentIcons).toHaveLength(1);
+  expect(persisted.recentSearches[0]).toBe("functions");
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Choose ZIP" })).toBeVisible();
+  await page.getByLabel("Choose icon package ZIP").setInputFiles(fixture);
+  await page.getByRole("searchbox", { name: "Search icons" }).waitFor();
+  await expect(
+    page.getByRole("button", { name: "Compact view" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  const reloadedNavigation = page.getByRole("navigation", {
+    name: "Workspace",
+  });
+  await reloadedNavigation.getByRole("button", { name: "Favorites" }).click();
+  await expect(
+    page.getByRole("button", { name: "Open App Service details, Compute" }),
+  ).toBeVisible();
+});
+
+test("workspace navigation and theme preferences survive reload without reopening the package", async ({
   page,
 }) => {
   await loadPackage(page);
@@ -100,12 +186,6 @@ test("workspace navigation preferences survive reload without reopening the pack
   await expect(
     navigation.getByRole("button", { name: "All icons" }),
   ).toHaveAttribute("aria-current", "page");
-
-  await navigation.getByRole("button", { name: "Favorites" }).click();
-  await expect(page.getByRole("heading", { name: "Favorites" })).toBeVisible();
-  await navigation.getByRole("button", { name: "Recent" }).click();
-  await expect(page.getByRole("heading", { name: "Recent" })).toBeVisible();
-  await navigation.getByRole("button", { name: "All icons" }).click();
 
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
   await expect(
@@ -144,7 +224,9 @@ test("key screens have no automatically detectable WCAG A/AA violations", async 
   await page.getByRole("searchbox", { name: "Search icons" }).waitFor();
   await expectNoAxeViolations(page);
 
-  await page.getByRole("button", { name: "App Service, Compute" }).click();
+  await page
+    .getByRole("button", { name: "Open App Service details, Compute" })
+    .click();
   await page.getByRole("dialog").waitFor();
   await expectNoAxeViolations(page);
 });

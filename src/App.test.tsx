@@ -188,11 +188,11 @@ describe("icon browser UI", () => {
     expect(open).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Reading package")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "App Service, Compute" }),
+      screen.getByRole("button", { name: "Open App Service details, Compute" }),
     ).toBeVisible();
   });
 
-  it("exposes workspace destinations without populating Favorites or Recent early", async () => {
+  it("exposes workspace destinations with empty Favorites and Recent states", async () => {
     const user = userEvent.setup();
     installPackageOpenMock();
     render(<App />);
@@ -216,7 +216,7 @@ describe("icon browser UI", () => {
       within(navigation).getByRole("button", { name: "Favorites" }),
     );
     expect(
-      await screen.findByRole("heading", { name: "Favorites" }),
+      await screen.findByRole("heading", { name: "No favorites yet" }),
     ).toBeVisible();
     expect(
       within(navigation).getByRole("button", { name: "Favorites" }),
@@ -226,14 +226,16 @@ describe("icon browser UI", () => {
       within(navigation).getByRole("button", { name: "Recent" }),
     );
     expect(
-      await screen.findByRole("heading", { name: "Recent" }),
+      await screen.findByRole("heading", { name: "No recent icons yet" }),
     ).toBeVisible();
 
     await user.click(
       within(navigation).getByRole("button", { name: "All icons" }),
     );
     expect(
-      await screen.findByRole("button", { name: "App Service, Compute" }),
+      await screen.findByRole("button", {
+        name: "Open App Service details, Compute",
+      }),
     ).toBeVisible();
   });
 
@@ -272,13 +274,17 @@ describe("icon browser UI", () => {
     await loadDummyPackage(user);
 
     expect(
-      screen.getByRole("button", { name: "App Service, Compute" }),
+      screen.getByRole("button", { name: "Open App Service details, Compute" }),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "SQL, Compute/Databases" }),
+      screen.getByRole("button", {
+        name: "Open SQL details, Compute/Databases",
+      }),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Blob Storage, Storage" }),
+      screen.getByRole("button", {
+        name: "Open Blob Storage details, Storage",
+      }),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "All icons" })).toHaveAttribute(
       "aria-current",
@@ -295,11 +301,15 @@ describe("icon browser UI", () => {
     await user.type(search, "blob");
     await waitFor(() => {
       expect(
-        screen.queryByRole("button", { name: "App Service, Compute" }),
+        screen.queryByRole("button", {
+          name: "Open App Service details, Compute",
+        }),
       ).not.toBeInTheDocument();
     });
     expect(
-      screen.getByRole("button", { name: "Blob Storage, Storage" }),
+      screen.getByRole("button", {
+        name: "Open Blob Storage details, Storage",
+      }),
     ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: /^Compute/ }));
@@ -312,7 +322,9 @@ describe("icon browser UI", () => {
       screen.getByRole("button", { name: "Search all categories" }),
     );
     expect(
-      await screen.findByRole("button", { name: "Blob Storage, Storage" }),
+      await screen.findByRole("button", {
+        name: "Open Blob Storage details, Storage",
+      }),
     ).toBeVisible();
   });
 
@@ -322,7 +334,9 @@ describe("icon browser UI", () => {
     render(<App />);
     await loadDummyPackage(user);
 
-    const card = screen.getByRole("button", { name: "App Service, Compute" });
+    const card = screen.getByRole("button", {
+      name: "Open App Service details, Compute",
+    });
     const search = screen.getByRole("searchbox", { name: "Search icons" });
     card.focus();
     await user.keyboard("/");
@@ -343,7 +357,9 @@ describe("icon browser UI", () => {
     render(<App />);
     await loadDummyPackage(user);
 
-    const card = screen.getByRole("button", { name: "App Service, Compute" });
+    const card = screen.getByRole("button", {
+      name: "Open App Service details, Compute",
+    });
     await user.click(card);
     expect(await screen.findByRole("dialog")).toBeVisible();
     expect(screen.getByText("1-icon-service-App-Service.svg")).toBeVisible();
@@ -375,7 +391,7 @@ describe("icon browser UI", () => {
       "The ZIP is corrupt.",
     );
     expect(
-      screen.getByRole("button", { name: "App Service, Compute" }),
+      screen.getByRole("button", { name: "Open App Service details, Compute" }),
     ).toBeVisible();
     expect(screen.getAllByText("dummy-icons.zip").length).toBeGreaterThan(0);
     expect(dispose).not.toHaveBeenCalled();

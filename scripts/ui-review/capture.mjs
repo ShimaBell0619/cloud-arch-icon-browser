@@ -34,7 +34,9 @@ try {
     fullPage: true,
   });
 
-  await desktop.getByRole("button", { name: /App Service, Compute/ }).click();
+  await desktop
+    .getByRole("button", { name: "Open App Service details, Compute" })
+    .click();
   await desktop.getByRole("dialog").waitFor();
   await desktop.screenshot({
     path: `${output}/03-details-dialog-desktop.png`,
