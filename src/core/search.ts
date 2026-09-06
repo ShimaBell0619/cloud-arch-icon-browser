@@ -97,14 +97,27 @@ export class IconSearchIndex {
       }
     }
 
-    return [...results.values()].sort(
+    const sorted = [...results.values()].sort(
       (a, b) =>
         SEARCH_MATCH_PRIORITY[a.match] - SEARCH_MATCH_PRIORITY[b.match] ||
         a.score - b.score ||
         compareNames(a.icon.displayName, b.icon.displayName) ||
         compareNames(a.icon.id, b.icon.id),
     );
+
+    return categoryId === null ? dedupeGlobalResults(sorted) : sorted;
   }
+}
+
+function dedupeGlobalResults(
+  results: readonly IconSearchResult[],
+): IconSearchResult[] {
+  const filenames = new Set<string>();
+  return results.filter(({ icon }) => {
+    if (filenames.has(icon.originalFilename)) return false;
+    filenames.add(icon.originalFilename);
+    return true;
+  });
 }
 
 function deterministicMatch(
