@@ -1,10 +1,10 @@
 import { ImageOffIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { IconEntry, IconPackageSession } from "@/core";
 import {
   observePreviewHost,
   schedulePreviewWork,
 } from "@/components/preview-scheduler";
+import type { IconEntry, IconPackageSession } from "@/core";
 
 interface LazyIconPreviewProps {
   session: IconPackageSession;
