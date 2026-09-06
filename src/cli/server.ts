@@ -3,10 +3,15 @@ import {
   createServer,
   type IncomingMessage,
   type ServerResponse,
+  request as httpRequest,
 } from "node:http";
 import { extname, resolve, sep } from "node:path";
 
 const LOOPBACK_HOST = "127.0.0.1";
+export const CANONICAL_PORT = 41731;
+export const APP_INSTANCE_HEADER = "X-Cloud-Arch-Icon-Browser-Instance";
+const APP_INSTANCE_HEADER_VALUE = "1";
+const EXISTING_INSTANCE_PROBE_TIMEOUT_MS = 750;
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
@@ -50,11 +55,14 @@ interface StaticAsset {
 
 export interface StaticServerOptions {
   rootDirectory: string;
+  /** Test-only/embedding override. Packaged runtime omits this and uses CANONICAL_PORT. */
+  port?: number;
 }
 
 export interface RunningStaticServer {
   port: number;
   url: string;
+  reused: boolean;
   close: () => Promise<void>;
 }
 
@@ -63,7 +71,8 @@ export async function startStaticServer(
 ): Promise<RunningStaticServer> {
   const rootDirectory = await realpath(options.rootDirectory);
   const staticAssets = await loadStaticAssets(rootDirectory);
-  let selectedPort = 0;
+  const requestedPort = options.port ?? CANONICAL_PORT;
+  let selectedPort = requestedPort;
 
   const server = createServer((request, response) => {
     try {
@@ -85,7 +94,26 @@ export async function startStaticServer(
     }
   });
 
-  await listenOnAvailablePort(server);
+  try {
+    await listenOnPort(server, requestedPort);
+  } catch (error) {
+    if (requestedPort > 0 && isAddressInUseError(error)) {
+      const reused = await probeExistingInstance(requestedPort);
+      if (reused) {
+        return {
+          port: requestedPort,
+          url: appUrl(requestedPort),
+          reused: true,
+          close: () => Promise.resolve(),
+        };
+      }
+      throw new Error(
+        `Port ${requestedPort} is already in use by another process. Stop that process and run cloud-arch-icon-browser again.`,
+        { cause: error },
+      );
+    }
+    throw error;
+  }
 
   const address = server.address();
   if (address === null || typeof address === "string") {
@@ -94,12 +122,13 @@ export async function startStaticServer(
   }
 
   selectedPort = address.port;
-  const url = `http://${LOOPBACK_HOST}:${selectedPort}/`;
+  const url = appUrl(selectedPort);
   let closePromise: Promise<void> | null = null;
 
   return {
     port: selectedPort,
     url,
+    reused: false,
     close: () => {
       closePromise ??= closeServer(server);
       return closePromise;
@@ -280,6 +309,7 @@ function cacheControlFor(relativePath: string): string {
 }
 
 function applySecurityHeaders(response: ServerResponse): void {
+  response.setHeader(APP_INSTANCE_HEADER, APP_INSTANCE_HEADER_VALUE);
   response.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
   response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
   response.setHeader("Permissions-Policy", permissionsPolicy());
@@ -322,8 +352,9 @@ function sendText(
   response.end(body);
 }
 
-function listenOnAvailablePort(
+function listenOnPort(
   server: ReturnType<typeof createServer>,
+  port: number,
 ): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
     const handleError = (error: Error) => {
@@ -337,8 +368,53 @@ function listenOnAvailablePort(
 
     server.once("error", handleError);
     server.once("listening", handleListening);
-    server.listen({ host: LOOPBACK_HOST, port: 0 });
+    server.listen({ host: LOOPBACK_HOST, port });
   });
+}
+
+function probeExistingInstance(port: number): Promise<boolean> {
+  return new Promise((resolvePromise) => {
+    let settled = false;
+    const finish = (result: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolvePromise(result);
+    };
+
+    const clientRequest = httpRequest(
+      {
+        host: LOOPBACK_HOST,
+        port,
+        path: "/",
+        method: "HEAD",
+        headers: { Host: `${LOOPBACK_HOST}:${port}` },
+      },
+      (response) => {
+        const header = response.headers[APP_INSTANCE_HEADER.toLowerCase()];
+        response.resume();
+        finish(header === APP_INSTANCE_HEADER_VALUE);
+      },
+    );
+
+    clientRequest.setTimeout(EXISTING_INSTANCE_PROBE_TIMEOUT_MS, () => {
+      clientRequest.destroy();
+      finish(false);
+    });
+    clientRequest.on("error", () => finish(false));
+    clientRequest.end();
+  });
+}
+
+function isAddressInUseError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    error.code === "EADDRINUSE"
+  );
+}
+
+function appUrl(port: number): string {
+  return `http://${LOOPBACK_HOST}:${port}/`;
 }
 
 function closeServer(server: ReturnType<typeof createServer>): Promise<void> {
