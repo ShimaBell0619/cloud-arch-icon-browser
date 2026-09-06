@@ -1,4 +1,5 @@
 import { CheckIcon, CopyIcon, PlusIcon, StarIcon } from "lucide-react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { LazyIconPreview } from "@/components/lazy-icon-preview";
 import type { IconEntry, IconPackageSession, ViewPreference } from "@/core";
 
@@ -33,6 +34,34 @@ export function IconCard({
 }: IconCardProps) {
   const compact = view === "compact";
   const category = icon.categoryPath || "Top level";
+  const titleRef = useRef<HTMLParagraphElement>(null);
+  const tooltipId = useId();
+  const [titleTruncated, setTitleTruncated] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!compact) {
+      setTitleTruncated(false);
+      return;
+    }
+
+    const title = titleRef.current;
+    if (!title) return;
+
+    const updateTruncation = () => {
+      setTitleTruncated(title.scrollWidth > title.clientWidth + 1);
+    };
+
+    updateTruncation();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateTruncation);
+      return () => window.removeEventListener("resize", updateTruncation);
+    }
+
+    const observer = new ResizeObserver(updateTruncation);
+    observer.observe(title);
+    return () => observer.disconnect();
+  }, [compact]);
 
   return (
     <article
@@ -54,16 +83,18 @@ export function IconCard({
             ? `${selected ? "Deselect" : "Select"} ${icon.displayName}`
             : `Open ${icon.displayName} details, ${category}`
         }
+        aria-describedby={compact && titleTruncated ? tooltipId : undefined}
         aria-pressed={selectionMode ? selected : undefined}
-        className={`flex h-full w-full min-w-0 rounded-2xl text-left outline-none ${compact ? "items-center gap-3 px-3 pr-32" : "flex-col items-center gap-3 p-3 pt-5 text-center"}`}
+        className={`flex h-full w-full min-w-0 rounded-2xl text-left outline-none ${compact ? "compact-card-main items-center gap-3 px-3" : "flex-col items-center gap-3 p-3 pt-5 text-center"}`}
         onClick={(event) => {
           if (selectionMode) onToggleSelected?.();
           else onOpen(event.currentTarget);
         }}
       >
         <LazyIconPreview session={session} icon={icon} small={compact} />
-        <div className="min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1">
           <p
+            ref={compact ? titleRef : undefined}
             className={
               compact
                 ? "truncate text-sm font-medium"
@@ -72,6 +103,15 @@ export function IconCard({
           >
             {icon.displayName}
           </p>
+          {compact && titleTruncated ? (
+            <span
+              id={tooltipId}
+              role="tooltip"
+              className="pointer-events-none absolute left-0 top-full z-30 mt-2 max-w-72 rounded-lg border border-border bg-popover px-2.5 py-1.5 text-left text-xs font-medium text-popover-foreground opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              {icon.displayName}
+            </span>
+          ) : null}
           {!compact ? (
             <p className="mt-1 truncate text-xs text-muted-foreground">
               {category}
@@ -89,7 +129,11 @@ export function IconCard({
         </span>
       ) : (
         <div
-          className={`absolute flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${compact ? "right-2 top-1/2 -translate-y-1/2" : "right-2 top-2"}`}
+          className={
+            compact
+              ? "compact-card-actions absolute right-2 top-1/2 z-10 flex -translate-y-1/2 items-center gap-1 transition-opacity"
+              : "absolute right-2 top-2 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+          }
         >
           <button
             type="button"
@@ -100,7 +144,7 @@ export function IconCard({
             }
             aria-pressed={favorite}
             title={favorite ? "Remove favorite" : "Add favorite"}
-            className={`flex size-8 items-center justify-center rounded-xl border border-border bg-card/95 outline-none backdrop-blur transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 ${favorite ? "text-primary" : "text-muted-foreground"}`}
+            className={`flex size-8 items-center justify-center rounded-xl border border-border bg-card/95 outline-none backdrop-blur transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/30 ${compact ? "compact-card-secondary-action" : ""} ${favorite ? "text-primary" : "text-muted-foreground"}`}
             onClick={onToggleFavorite}
           >
             <StarIcon
@@ -114,7 +158,7 @@ export function IconCard({
               type="button"
               aria-label={`Add ${icon.displayName} to Tray`}
               title="Add to Tray"
-              className="flex size-8 items-center justify-center rounded-xl border border-border bg-card/95 text-muted-foreground outline-none backdrop-blur transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
+              className={`flex size-8 items-center justify-center rounded-xl border border-border bg-card/95 text-muted-foreground outline-none backdrop-blur transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 ${compact ? "compact-card-secondary-action" : ""}`}
               onClick={onAddToTray}
             >
               <PlusIcon aria-hidden="true" className="size-3.5" />
