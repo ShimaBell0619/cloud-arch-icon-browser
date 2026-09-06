@@ -16,6 +16,9 @@ const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
 const npmExecPath = process.env.npm_execpath;
+const NPM_COMMAND_TIMEOUT_MS = 120_000;
+const NPM_TARBALL_INSTALL_TIMEOUT_MS =
+  process.platform === "win32" ? 300_000 : NPM_COMMAND_TIMEOUT_MS;
 
 assert(typeof packageJson.name === "string", "package.json is missing name");
 assert(
@@ -99,10 +102,14 @@ try {
     "utf8",
   );
 
+  // CI runs npm ci before this smoke check, so production dependencies are
+  // already warm in npm's cache. Keep the isolated tarball install offline to
+  // avoid registry latency, and allow extra time on Windows where extraction
+  // and antivirus scanning can make the temporary install substantially slower.
   const installResult = runNpm(
     [
       "install",
-      "--prefer-offline",
+      "--offline",
       "--ignore-scripts",
       "--no-audit",
       "--no-fund",
@@ -111,6 +118,7 @@ try {
       tarballPath,
     ],
     installRoot,
+    NPM_TARBALL_INSTALL_TIMEOUT_MS,
   );
   assertSuccess(installResult, "installing packed CLI");
 
@@ -210,11 +218,11 @@ async function smokeInstalledServer(cliPath) {
   }
 }
 
-function runNpm(args, cwd) {
+function runNpm(args, cwd, timeout = NPM_COMMAND_TIMEOUT_MS) {
   return spawnSync(process.execPath, [npmExecPath, ...args], {
     cwd,
     encoding: "utf8",
-    timeout: 120_000,
+    timeout,
   });
 }
 
