@@ -28,7 +28,9 @@ test("loaded icon grid", async ({ page }) => {
 
 test("icon details dialog", async ({ page }) => {
   await loadPackage(page);
-  await page.getByRole("button", { name: "App Service, Compute" }).click();
+  await page
+    .getByRole("button", { name: "Open App Service details, Compute" })
+    .click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page).toHaveScreenshot("details-dialog.png", { fullPage: true });
 });
