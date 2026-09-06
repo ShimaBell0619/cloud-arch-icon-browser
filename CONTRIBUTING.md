@@ -80,7 +80,7 @@ Use `npm run check:fix` for formatting/import fixes and `npm run test:watch` for
 
 UI primitives live in `src/components/ui`; application composition lives outside that directory. `components.json` selects the Base UI-backed `base-rhea` style. Keep future primitive additions thin and retain upstream notices. Theme tokens and system-driven dark mode live in `src/index.css`.
 
-Vitest uses jsdom, React Testing Library, and the cleanup setup in `src/test`. Foundation CI measures every production module in `src/core` and enforces 90% lines/functions/statements and 85% branches. Reports are written to the ignored `coverage/` directory. Core fixtures are generated in memory from project-owned shapes; do not replace them with Microsoft assets. See the [core integration notes](./docs/icon-package-core.md).
+Vitest uses jsdom, React Testing Library, and the cleanup setup in `src/test`. Foundation CI measures every production module in `src/core` and enforces 90% lines/functions/statements and 85% branches. Reports are written to the ignored `coverage/` directory. Core fixtures are generated in memory from project-owned shapes; do not replace them with Microsoft assets.
 
 ## UI visual review
 

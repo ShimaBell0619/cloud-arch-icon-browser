@@ -1,116 +1,69 @@
-# UI review workflow
+# UI review and Pages preview
 
-This document defines the repository-standard visual review flow for UI changes.
-It is development infrastructure only. It does not add a supported hosted product
-mode or change the local-only runtime contract in `DESIGN.md`.
+This document defines maintainer-facing browser UI review and GitHub Pages preview workflows. Both are development infrastructure; neither changes the local-only product/runtime contract in `DESIGN.md`.
 
-## Default review path: Playwright screenshots
+## Automated browser review
 
-For pull requests that touch browser UI inputs, `.github/workflows/ui-review.yml`
-runs a real Chromium browser against the PR code. It:
+Browser UI changes use Playwright with project-owned synthetic ZIP/SVG fixtures. Microsoft Azure Architecture Icon ZIPs/SVGs must never be committed, used as test baselines, or uploaded as workflow artifacts.
 
-1. installs the repository dependencies using `.node-version`,
-2. installs a pinned Playwright version for the workflow only,
-3. generates a project-owned dummy Azure-shaped icon ZIP,
-4. starts Vite on `127.0.0.1`,
-5. loads the ZIP through the real file input,
-6. captures the fixed visual baseline, and
-7. uploads the screenshots as a GitHub Actions artifact for 14 days.
+`.github/workflows/ui-review.yml` runs for browser-UI-affecting pull requests and can also be started manually for a branch, tag, or commit SHA. It starts the real Vite app, loads the synthetic ZIP through the browser, captures screenshots, and uploads them as a 14-day Actions artifact.
 
-The fixture contains only simple project-owned SVG shapes. Microsoft Azure
-Architecture Icon ZIPs/SVGs must never be used by this workflow, committed to the
-repository, or uploaded as review artifacts.
-
-### Fixed baseline
-
-The capture set is intentionally stable so PRs can be compared consistently:
+The capture set is intentionally stable:
 
 | Capture | Viewport / mode |
 | --- | --- |
-| `01-unloaded-desktop.png` | 1440 x 1000, light |
-| `02-loaded-desktop.png` | 1440 x 1000, light |
-| `03-details-dialog-desktop.png` | 1440 x 1000, light |
-| `04-loaded-mobile.png` | 390 x 844, light |
-| `05-categories-mobile.png` | 390 x 844, light |
-| `06-loaded-desktop-dark.png` | 1440 x 1000, dark |
+| `01-unloaded-desktop.png` | 1440 × 1000, light |
+| `02-loaded-desktop.png` | 1440 × 1000, light |
+| `03-details-dialog-desktop.png` | 1440 × 1000, light |
+| `04-loaded-mobile.png` | 390 × 844, light |
+| `05-categories-mobile.png` | 390 × 844, light |
+| `06-loaded-desktop-dark.png` | 1440 × 1000, dark |
 
-The workflow deliberately uses the real package session and browser file input.
-The screenshot fixture is synthetic, but the ZIP parsing, category construction,
-preview Blob URLs, responsive UI, and dialogs use the application's real code
-path.
+Normal CI separately runs the Playwright golden path, automated WCAG A/AA checks through axe, and the committed visual-regression baselines. Update committed Playwright screenshots with `npm run test:e2e:update` only after confirming that a visual change is intentional.
 
-### Manual capture
+When reviewing a UI PR, inspect the actual screenshots rather than inferring visual correctness from source code or unit tests alone.
 
-After the workflow is present on `main`, it can also be run from **Actions > UI
-Review > Run workflow**. Supply a branch, tag, or commit SHA in `ref`.
+## GitHub Pages preview
 
-For ChatGPT-assisted review, the preferred request is simply:
+GitHub Pages is an optional interactive review surface for phones, tablets, and other browsers. It is not a supported distribution channel; npm/npx remains the supported product distribution.
 
-> Review the actual UI for PR #<number>.
+### Automatic main and PR previews
 
-The reviewer should inspect the PR's `UI Review` run, download the screenshot
-artifact, and review the images themselves rather than inferring appearance from
-source code alone.
+`.github/workflows/pages.yml` maintains the normal preview site:
 
-## Interactive review path: GitHub Pages
+- `main` publishes to `https://shimabell0619.github.io/cloud-arch-icon-browser/`.
+- Same-repository PR `#N` publishes to `https://shimabell0619.github.io/cloud-arch-icon-browser/pr-N/`.
+- Fork PRs are build-validated but are not published because untrusted fork code must not receive write-capable repository or Pages credentials.
+- Closing or merging a same-repository PR removes its `pr-N` preview.
 
-Use `.github/workflows/pages-preview.yml` only when a human reviewer needs to
-interact with the application from another device, such as a phone.
+The workflow stores generated site content on the automation-owned `pages-content` branch so `main` and active PR previews can coexist. Do not edit that branch manually. Main publication uses the `github-pages` environment; same-repository PR publish/cleanup uses `github-pages-preview`.
 
-Pages deployment is **manual only**. A pull request must never automatically
-replace the currently shared preview. The selected branch, tag, or commit SHA is
-explicitly supplied when the workflow is run.
+Pages builds use target-specific Vite bases: `/cloud-arch-icon-browser/` for `main` and `/cloud-arch-icon-browser/pr-N/` for PR previews. The normal npm/npx build continues to use `/`.
 
-The Pages site represents one current review build at a time. Publishing another
-ref intentionally replaces the previous preview.
+### Manual selected-ref preview
+
+`.github/workflows/pages-preview.yml` (`Publish Pages Preview`) can publish an explicitly selected branch, tag, or commit SHA for ad-hoc interactive review. This deploys the selected ref as the main Pages site, so use it only when intentionally replacing the current root preview.
 
 ### One-time repository setup
 
-A repository administrator must configure GitHub Pages once:
+GitHub Pages must use GitHub Actions as its source:
 
-1. Open **Settings > Pages**.
+1. Open **Settings → Pages**.
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 
-GitHub's Pages custom-workflow model uses `configure-pages`,
-`upload-pages-artifact`, and `deploy-pages`. The deploy job uses the protected
-`github-pages` environment and exposes the deployment URL from the workflow run.
+## Security and asset boundary
 
-### Publish a ref
+All preview paths preserve the same product boundaries:
 
-1. Open **Actions > Publish Pages Preview**.
-2. Choose **Run workflow**.
-3. Enter the branch, tag, or commit SHA to review, for example
-   `feat/issue-3-icon-browser-ui`.
-4. Run the workflow.
-5. Open the deployment URL shown by the `github-pages` environment.
+- deploy only repository-owned built application assets,
+- never publish or persist Microsoft ZIP/SVG assets,
+- process a user-selected ZIP only in the current browser session,
+- do not upload selected ZIP/SVG content to GitHub or another backend,
+- do not add telemetry, analytics, account state, cloud sync, or runtime package/update APIs,
+- do not persist file handles or silently reopen a package.
 
-The build uses the Pages base path reported by GitHub, so Vite's generated asset
-URLs work under the repository project-site path.
-
-## Security and product boundaries
-
-The two review paths have different roles:
-
-- **Actions artifact screenshots** are the normal visual QA mechanism.
-- **GitHub Pages** is an optional, temporary, development-only interactive preview.
-
-Neither path changes the product architecture. In particular:
-
-- no Microsoft icon asset is stored or published,
-- no selected user ZIP is persisted by the app,
-- no backend, database, account, or hosted-service feature is introduced,
-- no automatic application runtime API call is introduced,
-- the Pages build is not a supported distribution/release channel,
-- production/release decisions remain governed by `DESIGN.md`.
+The application may use the browser File System Access picker transiently when available, but the resulting handle is not persisted. Unsupported browsers and picker failures fall back to the normal ZIP file input.
 
 ## Maintenance
 
-Keep the screenshot names and viewports stable unless a deliberate review-policy
-change is needed. If navigation or accessibility names change legitimately, update
-`scripts/ui-review/capture.mjs` in the same PR so a failed visual workflow remains
-a meaningful signal rather than being silently skipped.
-
-The `src/components/icon-details-dialog.tsx` presence check exists only so this
-infrastructure PR can land before the browser UI implementation. Once the browser
-UI is on `main`, missing or changed runtime selectors in the capture script should
-fail the workflow rather than skip individual screenshots.
+Keep screenshot names and viewports stable unless the review policy intentionally changes. If navigation, accessibility names, or review flows change, update the relevant Playwright/UI-review scripts in the same PR so failures remain meaningful rather than being silently skipped.
