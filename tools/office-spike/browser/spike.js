@@ -17,7 +17,8 @@ const diagnostics = {
   clipboardWriteText: typeof navigator.clipboard?.writeText === "function",
   clipboardItem: typeof ClipboardItem !== "undefined",
   svgClipboardSupport:
-    typeof ClipboardItem !== "undefined" && typeof ClipboardItem.supports === "function"
+    typeof ClipboardItem !== "undefined" &&
+    typeof ClipboardItem.supports === "function"
       ? ClipboardItem.supports("image/svg+xml")
       : null,
   tests: [],
@@ -48,7 +49,13 @@ for (const button of document.querySelectorAll("button[data-action]")) {
       else if (action === "svg-png") await copySvgWithPngFallback();
       else if (action === "copy-diagnostics") await copyDiagnostics();
     } catch (error) {
-      record(action, "error", error instanceof Error ? `${error.name}: ${error.message}` : String(error));
+      record(
+        action,
+        "error",
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : String(error),
+      );
     } finally {
       button.disabled = false;
     }
@@ -64,15 +71,25 @@ for (const tile of document.querySelectorAll("[data-drag]")) {
 
     try {
       if (dragType === "png-file") {
-        const file = new File([pngBlobs[0]], "cab-office-spike.png", { type: "image/png" });
+        const file = new File([pngBlobs[0]], "cab-office-spike.png", {
+          type: "image/png",
+        });
         event.dataTransfer.items.add(file);
         event.dataTransfer.setData("text/uri-list", pngDataUrls[0]);
-        event.dataTransfer.setData("text/html", `<img src="${pngDataUrls[0]}" alt="Synthetic PNG" />`);
+        event.dataTransfer.setData(
+          "text/html",
+          `<img src="${pngDataUrls[0]}" alt="Synthetic PNG" />`,
+        );
       } else if (dragType === "svg-file") {
-        const file = new File([vectorSvgBlob], "cab-office-spike.svg", { type: "image/svg+xml" });
+        const file = new File([vectorSvgBlob], "cab-office-spike.svg", {
+          type: "image/svg+xml",
+        });
         event.dataTransfer.items.add(file);
         event.dataTransfer.setData("text/uri-list", vectorSvgDataUrl);
-        event.dataTransfer.setData("text/html", `<img src="${vectorSvgDataUrl}" alt="Synthetic SVG" />`);
+        event.dataTransfer.setData(
+          "text/html",
+          `<img src="${vectorSvgDataUrl}" alt="Synthetic SVG" />`,
+        );
       } else if (dragType === "chromium-download-url") {
         event.dataTransfer.setData(
           "DownloadURL",
@@ -84,7 +101,9 @@ for (const tile of document.querySelectorAll("[data-drag]")) {
       record(
         dragType,
         "drag-error",
-        error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : String(error),
       );
     }
   });
@@ -92,13 +111,20 @@ for (const tile of document.querySelectorAll("[data-drag]")) {
 
 async function copySinglePng() {
   requireClipboard();
-  await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlobs[0] })]);
-  record("single-png", "copied", { clipboardItems: 1, declaredTypes: [["image/png"]] });
+  await navigator.clipboard.write([
+    new ClipboardItem({ "image/png": pngBlobs[0] }),
+  ]);
+  record("single-png", "copied", {
+    clipboardItems: 1,
+    declaredTypes: [["image/png"]],
+  });
 }
 
 async function copyMultiplePngItems() {
   requireClipboard();
-  const items = pngBlobs.map((blob) => new ClipboardItem({ "image/png": blob }));
+  const items = pngBlobs.map(
+    (blob) => new ClipboardItem({ "image/png": blob }),
+  );
   await navigator.clipboard.write(items);
   record("multi-png", "copied", {
     clipboardItems: items.length,
@@ -120,13 +146,21 @@ async function copyHtmlImages() {
     "text/plain": new Blob([plain], { type: "text/plain" }),
   });
   await navigator.clipboard.write([item]);
-  record("html-images", "copied", { clipboardItems: 1, declaredTypes: item.types });
+  record("html-images", "copied", {
+    clipboardItems: 1,
+    declaredTypes: item.types,
+  });
 }
 
 async function copySvgWithPngFallback() {
   requireClipboard();
-  if (typeof ClipboardItem.supports !== "function" || !ClipboardItem.supports("image/svg+xml")) {
-    throw new Error("ClipboardItem.supports('image/svg+xml') is false in this browser.");
+  if (
+    typeof ClipboardItem.supports !== "function" ||
+    !ClipboardItem.supports("image/svg+xml")
+  ) {
+    throw new Error(
+      "ClipboardItem.supports('image/svg+xml') is false in this browser.",
+    );
   }
 
   const item = new ClipboardItem({
@@ -134,20 +168,27 @@ async function copySvgWithPngFallback() {
     "image/png": pngBlobs[2],
   });
   await navigator.clipboard.write([item]);
-  record("svg-png", "copied", { clipboardItems: 1, declaredTypes: item.types });
+  record("svg-png", "copied", {
+    clipboardItems: 1,
+    declaredTypes: item.types,
+  });
 }
 
 async function copyDiagnostics() {
-  if (!navigator.clipboard?.writeText) throw new Error("Clipboard.writeText is unavailable.");
+  if (!navigator.clipboard?.writeText)
+    throw new Error("Clipboard.writeText is unavailable.");
   const payload = JSON.stringify(diagnostics, null, 2);
   await navigator.clipboard.writeText(payload);
   record("copy-diagnostics", "copied", { bytes: new Blob([payload]).size });
 }
 
 function requireClipboard() {
-  if (!window.isSecureContext) throw new Error("The page is not a secure context.");
-  if (!navigator.clipboard?.write) throw new Error("navigator.clipboard.write is unavailable.");
-  if (typeof ClipboardItem === "undefined") throw new Error("ClipboardItem is unavailable.");
+  if (!window.isSecureContext)
+    throw new Error("The page is not a secure context.");
+  if (!navigator.clipboard?.write)
+    throw new Error("navigator.clipboard.write is unavailable.");
+  if (typeof ClipboardItem === "undefined")
+    throw new Error("ClipboardItem is unavailable.");
 }
 
 function renderEnvironment() {
@@ -211,7 +252,8 @@ function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("Blob data URL conversion failed."));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Blob data URL conversion failed."));
     reader.readAsDataURL(blob);
   });
 }

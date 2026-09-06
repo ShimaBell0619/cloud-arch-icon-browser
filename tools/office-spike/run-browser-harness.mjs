@@ -1,5 +1,5 @@
-import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,19 +29,37 @@ const server = createServer(async (request, response) => {
 
   const expectedHosts = new Set([`${HOST}:${PORT}`, `localhost:${PORT}`]);
   if (!expectedHosts.has((request.headers.host ?? "").toLowerCase())) {
-    send(response, 403, "text/plain; charset=utf-8", "Forbidden\n", request.method);
+    send(
+      response,
+      403,
+      "text/plain; charset=utf-8",
+      "Forbidden\n",
+      request.method,
+    );
     return;
   }
 
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.setHeader("Allow", "GET, HEAD");
-    send(response, 405, "text/plain; charset=utf-8", "Method Not Allowed\n", request.method);
+    send(
+      response,
+      405,
+      "text/plain; charset=utf-8",
+      "Method Not Allowed\n",
+      request.method,
+    );
     return;
   }
 
   const path = resolveRequestPath(request.url);
   if (!path) {
-    send(response, 400, "text/plain; charset=utf-8", "Bad Request\n", request.method);
+    send(
+      response,
+      400,
+      "text/plain; charset=utf-8",
+      "Bad Request\n",
+      request.method,
+    );
     return;
   }
 
@@ -55,18 +73,35 @@ const server = createServer(async (request, response) => {
       request.method,
     );
   } catch {
-    send(response, 404, "text/plain; charset=utf-8", "Not Found\n", request.method);
+    send(
+      response,
+      404,
+      "text/plain; charset=utf-8",
+      "Not Found\n",
+      request.method,
+    );
   }
 });
 
 server.listen({ host: HOST, port: PORT }, () => {
-  console.log(`Office interoperability browser harness: http://${HOST}:${PORT}/`);
-  console.log("Open that URL in current stable Edge and Chrome. Press Ctrl+C to stop.");
+  console.log(
+    `Office interoperability browser harness: http://${HOST}:${PORT}/`,
+  );
+  console.log(
+    "Open that URL in current stable Edge and Chrome. Press Ctrl+C to stop.",
+  );
 });
 
 server.on("error", (error) => {
-  if (error && typeof error === "object" && "code" in error && error.code === "EADDRINUSE") {
-    console.error(`Port ${PORT} is already in use. Stop that process and retry.`);
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "EADDRINUSE"
+  ) {
+    console.error(
+      `Port ${PORT} is already in use. Stop that process and retry.`,
+    );
     process.exitCode = 1;
     return;
   }
@@ -80,10 +115,12 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 }
 
 function resolveRequestPath(rawUrl) {
-  if (!rawUrl || !rawUrl.startsWith("/") || rawUrl.startsWith("//")) return null;
+  if (!rawUrl?.startsWith("/") || rawUrl.startsWith("//")) return null;
   let pathname;
   try {
-    pathname = decodeURIComponent(new URL(rawUrl, `http://${HOST}:${PORT}`).pathname);
+    pathname = decodeURIComponent(
+      new URL(rawUrl, `http://${HOST}:${PORT}`).pathname,
+    );
   } catch {
     return null;
   }
@@ -92,7 +129,8 @@ function resolveRequestPath(rawUrl) {
   const relative = pathname === "/" ? "index.html" : pathname.slice(1);
   const normalized = normalize(relative).replaceAll("\\", "/");
   if (normalized.startsWith("../") || normalized === "..") return null;
-  if (!new Set(["index.html", "spike.js", "spike.css"]).has(normalized)) return null;
+  if (!new Set(["index.html", "spike.js", "spike.css"]).has(normalized))
+    return null;
   return normalized;
 }
 
