@@ -1,7 +1,5 @@
 # Cloud Arch Icon Browser
 
-> Current release: `v0.1.0`
-
 A local, browser-based viewer for Microsoft Azure Architecture Icons.
 
 Cloud Arch Icon Browser is an independent open-source project. It is not affiliated with, endorsed by, or sponsored by Microsoft.
@@ -14,20 +12,28 @@ Microsoft Azure Architecture Icons are **not included** in this repository or np
 npx @shimabell06/cloud-arch-icon-browser
 ```
 
-The command starts a temporary HTTP server bound to `127.0.0.1` on an available port and opens the local web UI in the default browser. The ZIP selected by the user is processed locally and is not uploaded or persisted by the application.
+The command runs the latest published npm release, starts a temporary HTTP server bound to `127.0.0.1` on an available port, and opens the local web UI in the default browser. The ZIP selected by the user is processed locally and is not uploaded or persisted by the application.
 
 ## Features
 
-`v0.1.0` provides the first complete public release of the local icon-browser workflow:
+The current product workflow includes:
 
 - Load a user-selected official Azure Architecture Icons ZIP.
 - Preserve and browse the ZIP folder hierarchy as categories.
-- Search icons with exact, prefix, substring, normalized, and fuzzy matching.
-- Preview SVG icons without modifying the original SVG.
-- Download individual original SVG files with their official filenames unchanged.
+- Search display names, original filenames, and category paths with deterministic exact → prefix → substring ranking ahead of fuzzy matches.
+- Keep category scope explicit through a removable filter chip while preserving the active query.
+- Use keyboard-operable search autocomplete with icon previews, recent searches, and favorite shortcuts.
+- Save Favorites, recently opened icons, recent searches, theme, Grid/Compact preference, and sidebar state as local UI metadata without persisting the ZIP or SVG contents.
+- Switch between Grid and Compact icon layouts.
+- Copy an icon as a transparent 512×512 PNG for compatible clipboard workflows such as Windows PowerPoint and Excel.
+- Open a centered details dialog with real package metadata, Favorite, Copy image, Copy SVG where supported, and original SVG download actions.
+- Preserve original SVG bytes and filenames for download.
+- Explicitly select System / Light / Dark theme behavior.
 - Replace the active package without reloading the application.
-- Use responsive navigation, details dialogs, and keyboard interactions.
+- Use responsive desktop and mobile navigation with keyboard and accessibility support.
 - Run locally through `npx` with no automatic runtime network access.
+
+`Copy image` depends on browser Clipboard API support and permission. If image clipboard writes are unavailable or denied, the app reports the failure and the original SVG download remains available.
 
 ## Official icon package
 
@@ -41,9 +47,9 @@ The latest package explicitly verified for this project is recorded in [`COMPATI
 
 ## Project status
 
-`v0.1.0` is published on npm as `@shimabell06/cloud-arch-icon-browser` and is the first public release. The production package contains the localhost CLI and prebuilt Web UI; Microsoft icon ZIP/SVG assets are never bundled into the package.
+Public releases are published on npm as `@shimabell06/cloud-arch-icon-browser`; `v0.1.0` was the first public release. Version-specific release history is recorded in [`CHANGELOG.md`](./CHANGELOG.md) and GitHub Releases rather than duplicated as a hard-coded "current version" in this README.
 
-The implementation includes a React-independent core for ZIP validation, metadata/categories, search, lazy SVG previews, and original-file downloads. The production localhost CLI/static server uses loopback-only binding, Host/path validation, restrictive browser security headers, and clean shutdown behavior.
+The production package contains the localhost CLI and prebuilt Web UI; Microsoft icon ZIP/SVG assets are never bundled into the package. The application includes a React-independent core for ZIP validation, metadata/categories, search, durable local UI identity, lazy SVG previews, and original-file downloads. The production localhost CLI/static server uses loopback-only binding, Host/path validation, restrictive browser security headers, and clean shutdown behavior.
 
 Release and maintenance automation includes Linux browser E2E/accessibility/visual regression, Linux build/package checks, Windows/macOS packaged CLI smoke tests, npm package leak validation, Changesets release PRs, npm Trusted Publishing through GitHub Actions OIDC with provenance, registry/tarball availability verification, and a weekly Microsoft source-change watcher.
 
