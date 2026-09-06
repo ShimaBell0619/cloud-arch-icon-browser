@@ -62,13 +62,13 @@ import {
   type ThemePreference,
 } from "@/core";
 import { clipboardErrorMessage, copyIconAsPng } from "@/lib/icon-clipboard";
+import { choosePackageFile } from "@/lib/package-file-picker";
 import {
   commitSelectedPackageHandle,
   forgetRememberedPackageHandle,
   hasRememberedPackageHandle,
   openRememberedPackageFile,
 } from "@/lib/package-handle-store";
-import { choosePackageFile } from "@/lib/package-file-picker";
 import { version } from "../package.json";
 
 const PACKAGE_ACCEPT = ".zip,application/zip,application/x-zip-compressed";
@@ -350,7 +350,10 @@ function PackagePicker({ loadPhase, loadError, onLoad }: PackagePickerProps) {
               <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                 {rememberedPackageAvailable ? (
                   <Button type="button" size="lg" onClick={openPrevious}>
-                    <RefreshCwIcon aria-hidden="true" data-icon="inline-start" />
+                    <RefreshCwIcon
+                      aria-hidden="true"
+                      data-icon="inline-start"
+                    />
                     Open previous ZIP
                   </Button>
                 ) : null}
