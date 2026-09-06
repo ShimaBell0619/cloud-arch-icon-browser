@@ -104,7 +104,10 @@ export function IconDetailsDialog({
     try {
       await copySvgText(session, icon);
       onUsed?.(icon);
-      setNotice({ kind: "success", message: "Copied original SVG text." });
+      setNotice({
+        kind: "success",
+        message: "Copied original SVG source text.",
+      });
     } catch (error) {
       setNotice({ kind: "error", message: clipboardErrorMessage(error) });
     } finally {
@@ -286,7 +289,7 @@ export function IconDetailsDialog({
                 ) : (
                   <FileCode2Icon aria-hidden="true" data-icon="inline-start" />
                 )}
-                Copy SVG
+                Copy SVG source
               </Button>
             ) : null}
             <Button

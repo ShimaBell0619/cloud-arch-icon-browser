@@ -16,6 +16,9 @@ const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
 const npmExecPath = process.env.npm_execpath;
+const NPM_COMMAND_TIMEOUT_MS = 120_000;
+const NPM_TARBALL_INSTALL_TIMEOUT_MS =
+  process.platform === "win32" ? 300_000 : NPM_COMMAND_TIMEOUT_MS;
 
 assert(typeof packageJson.name === "string", "package.json is missing name");
 assert(
@@ -99,6 +102,9 @@ try {
     "utf8",
   );
 
+  // Prefer npm's warm CI cache but retain registry fallback because installing
+  // the isolated tarball may still need package metadata that npm ci did not
+  // cache. Windows gets extra time for extraction and antivirus scanning.
   const installResult = runNpm(
     [
       "install",
@@ -111,6 +117,7 @@ try {
       tarballPath,
     ],
     installRoot,
+    NPM_TARBALL_INSTALL_TIMEOUT_MS,
   );
   assertSuccess(installResult, "installing packed CLI");
 
@@ -210,11 +217,11 @@ async function smokeInstalledServer(cliPath) {
   }
 }
 
-function runNpm(args, cwd) {
+function runNpm(args, cwd, timeout = NPM_COMMAND_TIMEOUT_MS) {
   return spawnSync(process.execPath, [npmExecPath, ...args], {
     cwd,
     encoding: "utf8",
-    timeout: 120_000,
+    timeout,
   });
 }
 

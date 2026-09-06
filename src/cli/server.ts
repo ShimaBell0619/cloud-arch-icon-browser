@@ -6,6 +6,10 @@ import {
   request as httpRequest,
 } from "node:http";
 import { extname, resolve, sep } from "node:path";
+import {
+  createPowerPointBridge,
+  type PowerPointBridge,
+} from "./powerpoint-bridge.js";
 
 const LOOPBACK_HOST = "127.0.0.1";
 export const CANONICAL_PORT = 41731;
@@ -57,6 +61,8 @@ export interface StaticServerOptions {
   rootDirectory: string;
   /** Test-only/embedding override. Packaged runtime omits this and uses CANONICAL_PORT. */
   port?: number;
+  /** Test-only bridge override. Packaged runtime creates a process-scoped bridge. */
+  powerPointBridge?: PowerPointBridge;
 }
 
 export interface RunningStaticServer {
@@ -71,19 +77,25 @@ export async function startStaticServer(
 ): Promise<RunningStaticServer> {
   const rootDirectory = await realpath(options.rootDirectory);
   const staticAssets = await loadStaticAssets(rootDirectory);
+  const powerPointBridge =
+    options.powerPointBridge ?? createPowerPointBridge();
   const requestedPort = options.port ?? CANONICAL_PORT;
   let selectedPort = requestedPort;
 
   const server = createServer((request, response) => {
-    try {
-      handleRequest(request, response, staticAssets, selectedPort);
-    } catch {
+    void handleRequest(
+      request,
+      response,
+      staticAssets,
+      powerPointBridge,
+      selectedPort,
+    ).catch(() => {
       if (!response.headersSent) {
         sendText(request, response, 500, "Internal Server Error\n");
         return;
       }
       response.destroy();
-    }
+    });
   });
 
   server.on("clientError", (_error, socket) => {
@@ -136,16 +148,22 @@ export async function startStaticServer(
   };
 }
 
-function handleRequest(
+async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
   staticAssets: ReadonlyMap<string, StaticAsset>,
+  powerPointBridge: PowerPointBridge,
   port: number,
-): void {
+): Promise<void> {
   applySecurityHeaders(response);
 
   if (!isExpectedHost(request.headers.host, port)) {
     sendText(request, response, 403, "Forbidden\n");
+    return;
+  }
+
+  if (powerPointBridge.matches(request.url)) {
+    await powerPointBridge.handle(request, response, port);
     return;
   }
 
