@@ -75,7 +75,9 @@ export async function renderSvgBlobToPng(
   }
 }
 
-export async function writePngToClipboard(png: Blob): Promise<void> {
+export async function writePngToClipboard(
+  png: Blob | Promise<Blob>,
+): Promise<void> {
   if (
     typeof navigator === "undefined" ||
     !navigator.clipboard ||
@@ -94,6 +96,7 @@ export async function writePngToClipboard(png: Blob): Promise<void> {
       }),
     ]);
   } catch (error) {
+    if (error instanceof ClipboardImageError) throw error;
     if (isNotAllowedError(error)) {
       throw new ClipboardImageError(
         "Clipboard access was denied. Allow clipboard access and try again.",
@@ -109,10 +112,15 @@ export async function copyIconAsPng(
   session: IconPackageSession,
   icon: IconEntry,
 ): Promise<void> {
-  // getPreviewUrl performs the existing defense-in-depth SVG preview check.
-  await session.getPreviewUrl(icon.id);
-  const source = await session.getSvgBlob(icon.id);
-  const png = await renderSvgBlobToPng(source, COPY_IMAGE_SIZE);
+  // Start Clipboard.write synchronously from the click handler and supply a
+  // Promise representation while the source is safely rendered. This retains
+  // transient user activation on browsers that require it for clipboard writes.
+  const png = (async () => {
+    // getPreviewUrl performs the existing defense-in-depth SVG preview check.
+    await session.getPreviewUrl(icon.id);
+    const source = await session.getSvgBlob(icon.id);
+    return renderSvgBlobToPng(source, COPY_IMAGE_SIZE);
+  })();
   await writePngToClipboard(png);
 }
 
