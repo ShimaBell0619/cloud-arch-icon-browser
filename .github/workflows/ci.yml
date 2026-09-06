@@ -122,11 +122,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Create project-owned E2E fixture
-        run: python3 scripts/ui-review/create_fixture.py /tmp/cloud-arch-icon-browser-e2e-fixture.zip
+      - name: Create project-owned E2E fixtures
+        run: |
+          python3 scripts/ui-review/create_fixture.py /tmp/cloud-arch-icon-browser-e2e-fixture.zip
+          python3 scripts/ui-review/create_fixture.py /tmp/cloud-arch-icon-browser-preview-performance-fixture.zip 160
       - name: Run Playwright suite
         env:
           E2E_FIXTURE: /tmp/cloud-arch-icon-browser-e2e-fixture.zip
+          E2E_PERF_FIXTURE: /tmp/cloud-arch-icon-browser-preview-performance-fixture.zip
         run: npm run test:e2e
       - name: Upload Playwright diagnostics
         if: always()
