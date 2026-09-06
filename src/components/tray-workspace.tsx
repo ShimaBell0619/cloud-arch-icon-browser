@@ -22,6 +22,7 @@ interface TrayWorkspaceProps {
   onMove: (item: TrayItem, direction: -1 | 1) => void;
   onClear: () => void;
   onSaveAsSet: (name: string) => boolean;
+  onRenameSet: (set: SavedSetRecord, name: string) => boolean;
   onUpdateSetFromTray: (set: SavedSetRecord) => void;
   onDeleteSet: (set: SavedSetRecord) => void;
   onLoadSet: (set: SavedSetRecord, mode: "add" | "replace") => void;
@@ -38,6 +39,7 @@ export function TrayWorkspace({
   onMove,
   onClear,
   onSaveAsSet,
+  onRenameSet,
   onUpdateSetFromTray,
   onDeleteSet,
   onLoadSet,
@@ -45,6 +47,8 @@ export function TrayWorkspace({
   onImportSet,
 }: TrayWorkspaceProps) {
   const [setName, setSetName] = useState("");
+  const [renamingSetId, setRenamingSetId] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const total = items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -199,6 +203,60 @@ export function TrayWorkspace({
                     <Trash2Icon aria-hidden="true" />
                   </Button>
                 </div>
+                {renamingSetId === set.id ? (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="text"
+                      value={renameName}
+                      maxLength={80}
+                      aria-label={`Rename Saved Set ${set.name}`}
+                      className="h-9 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                      onChange={(event) =>
+                        setRenameName(event.currentTarget.value)
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter") return;
+                        if (onRenameSet(set, renameName)) {
+                          setNotice(
+                            `Renamed Saved Set to ${renameName.trim()}.`,
+                          );
+                          setRenamingSetId(null);
+                          setRenameName("");
+                        } else {
+                          setNotice("Enter a non-empty Saved Set name.");
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        if (onRenameSet(set, renameName)) {
+                          setNotice(
+                            `Renamed Saved Set to ${renameName.trim()}.`,
+                          );
+                          setRenamingSetId(null);
+                          setRenameName("");
+                        } else {
+                          setNotice("Enter a non-empty Saved Set name.");
+                        }
+                      }}
+                    >
+                      Save name
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setRenamingSetId(null);
+                        setRenameName("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     type="button"
@@ -214,6 +272,18 @@ export function TrayWorkspace({
                     onClick={() => onLoadSet(set, "replace")}
                   >
                     Replace Tray
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Rename Saved Set ${set.name}`}
+                    onClick={() => {
+                      setRenamingSetId(set.id);
+                      setRenameName(set.name);
+                    }}
+                  >
+                    Rename
                   </Button>
                   <Button
                     type="button"
@@ -245,6 +315,26 @@ export function TrayWorkspace({
                     Copy Set
                   </Button>
                 </div>
+                <details className="mt-3 rounded-xl border border-border px-3 py-2 text-xs">
+                  <summary className="cursor-pointer font-medium text-muted-foreground">
+                    View contents
+                  </summary>
+                  <ul className="mt-2 space-y-1 text-foreground">
+                    {set.items.map((item) => (
+                      <li
+                        key={item.canonicalPath}
+                        className="flex justify-between gap-3"
+                      >
+                        <span className="min-w-0 truncate">
+                          {item.displayName}
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          ×{item.quantity}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               </article>
             ))}
           </div>

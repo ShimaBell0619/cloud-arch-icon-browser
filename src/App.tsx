@@ -44,6 +44,7 @@ import {
   SearchAutocomplete,
   type SearchAutocompleteItem,
 } from "@/components/search-autocomplete";
+import { TrayQuickPanel } from "@/components/tray-quick-panel";
 import { TrayWorkspace } from "@/components/tray-workspace";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +71,7 @@ import {
   recordRecentSearch,
   removeFavorite,
   removeTrayItem,
+  renameSavedSet,
   resolveSavedSet,
   type SavedSetRecord,
   savePersistedState,
@@ -468,6 +470,7 @@ function LoadedWorkspace({
     null,
   );
   const [navigationSheetOpen, setNavigationSheetOpen] = useState(false);
+  const [trayPanelOpen, setTrayPanelOpen] = useState(false);
   const [categoriesExpanded, setCategoriesExpanded] = useState(true);
   const [dropNotice, setDropNotice] = useState<string | null>(null);
   const [autocompleteOpen, setAutocompleteOpen] = useState(false);
@@ -647,6 +650,7 @@ function LoadedWorkspace({
   };
 
   const showTray = () => {
+    setTrayPanelOpen(false);
     setWorkspaceView("tray");
     setSelectedCategory(null);
     setQuery("");
@@ -831,6 +835,12 @@ function LoadedWorkspace({
         })),
       ),
     );
+    return true;
+  };
+
+  const renameSet = (set: SavedSetRecord, name: string): boolean => {
+    if (!name.trim()) return false;
+    onPersistedStateChange((state) => renameSavedSet(state, set.id, name));
     return true;
   };
 
@@ -1027,8 +1037,8 @@ function LoadedWorkspace({
               type="button"
               variant={workspaceView === "tray" ? "default" : "outline"}
               size="sm"
-              aria-label={`Open Tray, ${trayTotalQuantity(trayItems)} objects`}
-              onClick={showTray}
+              aria-label={`Open Tray panel, ${trayTotalQuantity(trayItems)} objects`}
+              onClick={() => setTrayPanelOpen(true)}
               onDragOver={(event) => {
                 if (event.dataTransfer.types.includes(ICON_DRAG_MIME)) {
                   event.preventDefault();
@@ -1147,6 +1157,7 @@ function LoadedWorkspace({
               }
               onClear={() => onTrayItemsChange(() => [])}
               onSaveAsSet={saveTrayAsSet}
+              onRenameSet={renameSet}
               onUpdateSetFromTray={updateSetFromTray}
               onDeleteSet={(set) =>
                 onPersistedStateChange((state) => deleteSavedSet(state, set.id))
@@ -1271,6 +1282,28 @@ function LoadedWorkspace({
         onThemeChange={(theme) => onPreferencesChange({ theme })}
         onChangePackage={chooseReplacement}
         onRequestClose={() => setNavigationSheetOpen(false)}
+      />
+
+      <TrayQuickPanel
+        open={trayPanelOpen}
+        session={session}
+        items={trayItems}
+        onClose={() => setTrayPanelOpen(false)}
+        onSetQuantity={(item, quantity) =>
+          onTrayItemsChange((current) =>
+            setTrayItemQuantity(
+              current,
+              item.reference.canonicalPath,
+              quantity,
+            ),
+          )
+        }
+        onRemove={(item) =>
+          onTrayItemsChange((current) =>
+            removeTrayItem(current, item.reference.canonicalPath),
+          )
+        }
+        onViewFullTray={showTray}
       />
 
       <IconDetailsDialog

@@ -330,6 +330,24 @@ export function updateSavedSet(
   return changed ? { ...state, savedSets } : state;
 }
 
+export function renameSavedSet(
+  state: PersistedState,
+  id: string,
+  name: string,
+  updatedAt = Date.now(),
+): PersistedState {
+  const normalizedName = normalizeSavedSetName(name);
+  if (!normalizedName) return state;
+
+  let changed = false;
+  const savedSets = state.savedSets.map((set) => {
+    if (set.id !== id) return set;
+    changed = true;
+    return { ...set, name: normalizedName, updatedAt };
+  });
+  return changed ? { ...state, savedSets } : state;
+}
+
 export function deleteSavedSet(
   state: PersistedState,
   id: string,

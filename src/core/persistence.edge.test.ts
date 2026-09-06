@@ -9,6 +9,7 @@ import {
   parseSavedSetShare,
   recordIconUsage,
   recordRecentIcon,
+  renameSavedSet,
   resolveSavedSet,
   serializeSavedSet,
   updateSavedSet,
@@ -165,6 +166,14 @@ describe("persistence edge cases", () => {
     );
     expect(state.savedSets[0]?.items).toHaveLength(1);
     expect(state.savedSets[0]?.items[0]?.quantity).toBe(3);
+
+    const itemsBeforeRename = state.savedSets[0]?.items;
+    expect(renameSavedSet(state, "missing", "Other", 15)).toBe(state);
+    expect(renameSavedSet(state, "set-1", "   ", 15)).toBe(state);
+    state = renameSavedSet(state, "set-1", "Renamed", 15);
+    expect(state.savedSets[0]?.name).toBe("Renamed");
+    expect(state.savedSets[0]?.updatedAt).toBe(15);
+    expect(state.savedSets[0]?.items).toEqual(itemsBeforeRename);
 
     const beforeUpdate = state;
     expect(

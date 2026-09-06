@@ -54,6 +54,7 @@ export {
   recordRecentIcon,
   recordRecentSearch,
   removeFavorite,
+  renameSavedSet,
   resolveSavedSet,
   SAVED_SET_NAME_LIMIT,
   savePersistedState,
