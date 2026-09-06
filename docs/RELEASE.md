@@ -46,6 +46,25 @@ For a user-visible or package-relevant change:
 
 Docs-only or internal changes that do not alter packaged/user-visible release content normally do not require a Changeset.
 
+### Release PR creation fallback
+
+The Changesets action can generate/update `changeset-release/main` even when repository-level GitHub Actions settings prohibit Actions from opening a pull request. The characteristic error is:
+
+```text
+GitHub Actions is not permitted to create or approve pull requests.
+```
+
+If this occurs:
+
+1. Confirm the Changesets job successfully generated `changeset-release/main` before the PR-creation failure.
+2. Compare `changeset-release/main` against `main` and verify that the version, generated `CHANGELOG.md`, lockfile, and consumed Changesets are exactly the expected release output.
+3. Open `changeset-release/main` → `main` manually as `chore: release packages` without regenerating or editing the generated release content.
+4. Keep the same release-specific acceptance gates and explicit maintainer-approval requirement before merge.
+
+For future fully automatic Release PR creation, a repository maintainer may enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**. The workflow already requests `contents: write` and `pull-requests: write`; the repository-level switch is independent of those YAML permissions.
+
+This PR-creation setting does not alter npm Trusted Publishing/OIDC. Publication is still handled separately by `release.yml` after the release PR is merged.
+
 ## Release-specific product gates
 
 A Changesets Release PR is not sufficient evidence by itself that a feature release is ready. When an Epic or release-polish Issue defines additional acceptance criteria, those gates must be recorded before the release PR is merged.
