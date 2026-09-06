@@ -17,7 +17,9 @@ Cloud Arch Icon Browser is an independent open-source project. It is not affilia
 
 3. Choose the downloaded ZIP in the browser.
 
-The command starts a temporary localhost server bound to `127.0.0.1` and opens the app in your default browser. The selected ZIP is processed locally and is not uploaded or persisted by the application.
+The command serves the app from the stable local origin `http://127.0.0.1:41731/` and opens it in your default browser. A second invocation reuses the same running app; if another process occupies that port, the CLI reports an error rather than switching origins. The selected ZIP is processed locally and its bytes are never uploaded or copied into application storage.
+
+On browsers that support the File System Access API, a successfully validated selection can remember only the local file handle in IndexedDB. A later launch can use `Open previous ZIP` to request/read that file under normal browser permission rules, and `Forget previous ZIP reference` removes the handle. The app does not trigger a file-permission prompt automatically on page load. Unsupported browsers continue to use the normal ZIP picker.
 
 ## Features
 
@@ -28,7 +30,7 @@ The command starts a temporary localhost server bound to `127.0.0.1` and opens t
 - Copy icons as transparent 512×512 PNG images for compatible clipboard workflows such as Windows PowerPoint and Excel.
 - Copy SVG where supported or download the original SVG with its original filename.
 - System, Light, and Dark themes with responsive keyboard-accessible navigation.
-- Local-only package processing with no automatic runtime network access.
+- Local-only package processing with no automatic runtime network access; supported browsers can remember only a local file reference for the previous ZIP.
 
 `Copy image` depends on browser Clipboard API support and permission. If image clipboard writes are unavailable or denied, the app reports the failure and the original SVG remains available for download.
 

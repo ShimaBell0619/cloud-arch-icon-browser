@@ -1,5 +1,11 @@
 # @shimabell06/cloud-arch-icon-browser
 
+## 0.2.1
+
+### Patch Changes
+
+- 593c7b5: Deduplicate identical icon filenames in the global All icons results and search suggestions while preserving category-scoped entries.
+
 ## 0.2.0
 
 ### Minor Changes

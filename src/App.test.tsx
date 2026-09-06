@@ -161,9 +161,7 @@ describe("icon browser UI", () => {
       }),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Choose ZIP" })).toBeVisible();
-    expect(
-      screen.getByText(/processed locally for this session only/i),
-    ).toBeVisible();
+    expect(screen.getByText(/the package is processed locally/i)).toBeVisible();
 
     const link = screen.getByRole("link", { name: /Get official icons/ });
     expect(link).toHaveAttribute(
