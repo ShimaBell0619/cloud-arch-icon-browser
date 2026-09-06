@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { access, mkdir, rm } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { promisify } from "node:util";
 import { chromium } from "@playwright/test";
 
@@ -30,7 +30,7 @@ const videoDirectory = resolve(temporaryDirectory, "video");
 await assertFfmpeg();
 await rm(temporaryDirectory, { recursive: true, force: true });
 await mkdir(videoDirectory, { recursive: true });
-await mkdir(resolve(outputPath, ".."), { recursive: true });
+await mkdir(dirname(outputPath), { recursive: true });
 
 let devServer;
 let browser;
@@ -176,13 +176,10 @@ async function convertVideoToGif({
   trimStartSeconds,
   durationSeconds,
 }) {
-  const filter = [
-    "fps=12",
-    "scale=1024:-1:flags=lanczos",
-    "split[s0][s1]",
-    "[s0]palettegen=max_colors=128:stats_mode=diff[p]",
-    "[s1][p]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle",
-  ].join(";");
+  const filter =
+    "fps=12,scale=1024:-1:flags=lanczos,split[s0][s1];" +
+    "[s0]palettegen=max_colors=128:stats_mode=diff[p];" +
+    "[s1][p]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle";
 
   await execFileAsync(
     "ffmpeg",
