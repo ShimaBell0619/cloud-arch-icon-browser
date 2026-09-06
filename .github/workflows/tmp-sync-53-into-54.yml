@@ -16,21 +16,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: feat/46-47-tray-saved-sets
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .node-version
           cache: npm
-      - run: npm ci
-      - run: python scripts/tmp-sync-53-into-54.py
-      - run: npx biome check --write src/App.tsx
-      - run: npm run check
-      - run: npm run typecheck
-      - run: npm test
-      - name: Commit synced overlap
+      - name: Align overlapping files with merged PR 53
         shell: bash
         run: |
+          python scripts/tmp-sync-53-into-54.py
+          npx biome check --write src/App.tsx
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/App.tsx DESIGN.md
           git commit -m "merge: align Tray work with stable-origin changes"
-          git push origin HEAD:feat/46-47-tray-saved-sets
+      - name: Merge current main
+        shell: bash
+        run: |
+          git fetch origin main
+          git merge --no-edit origin/main
+      - run: npm ci
+      - run: npm run check
+      - run: npm run typecheck
+      - run: npm test
+      - name: Push integrated branch
+        shell: bash
+        run: git push origin HEAD:feat/46-47-tray-saved-sets
