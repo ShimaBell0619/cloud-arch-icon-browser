@@ -1,12 +1,6 @@
 # Release Runbook
 
-This project uses Changesets for release intent and GitHub Actions for publication. Normal publication uses npm Trusted Publishing (OIDC); no long-lived npm publish token belongs in this repository.
-
-## Release state
-
-Published release state is determined by the npm registry, `package.json`, immutable Git tags, GitHub Releases, and `CHANGELOG.md`. This runbook intentionally does not duplicate a hard-coded "current version" that can become stale between release steps.
-
-The first public release was `v0.1.0`, published on 2026-09-06 (JST).
+This project uses Changesets for release intent and GitHub Actions for npm publication. Normal publication uses npm Trusted Publishing/OIDC; no long-lived npm publish token belongs in this repository.
 
 Package:
 
@@ -14,176 +8,142 @@ Package:
 @shimabell06/cloud-arch-icon-browser
 ```
 
-Current publication contract:
+Do not duplicate a hard-coded current version in this runbook. Published state is determined by `package.json`, npm, immutable Git tags, GitHub Releases, and `CHANGELOG.md`.
 
-- npm package access is public.
-- GitHub Actions publishes through npm Trusted Publishing/OIDC.
-- npm publication includes provenance generated from the GitHub Actions build identity.
-- `package.json`, npm, the immutable `vX.Y.Z` Git tag, and the GitHub Release must use the same version.
-- The release workflow is idempotent: an already-published npm version is detected and is not published again.
-- Git tag and GitHub Release creation happen only after npm metadata **and the package tarball** are retrievable.
+## Release contract
 
-The current official `Azure_Public_Service_Icons_V24.zip` has passed the production-parser verification recorded in [`COMPATIBILITY.md`](../COMPATIBILITY.md).
+- npm access is public.
+- User-visible or package-relevant changes normally include a Changeset.
+- A human explicitly approves and merges the generated Release PR; green CI alone must never auto-merge a release.
+- GitHub Actions publishes through npm Trusted Publishing/OIDC and includes provenance.
+- `package.json`, npm, immutable `vX.Y.Z`, and the matching GitHub Release must identify the same version.
+- Existing version tags are never moved.
+- GitHub tag/Release creation happens only after npm metadata and the package tarball are retrievable.
+- Microsoft Azure Architecture Icon ZIP/SVG assets must never enter the repository, npm package, or release artifacts.
+
+Docs-only/internal maintenance that does not change packaged or user-visible behavior normally does not require a Changeset.
 
 ## Normal release flow
 
-For a user-visible or package-relevant change:
-
-1. Add an appropriate Changeset in the feature/fix PR:
+1. In a feature/fix PR, add a Changeset when the change is release-relevant:
 
    ```bash
    npm run changeset
    ```
 
-2. Select the SemVer bump and describe the release-facing change.
-3. Merge the PR to `main` after required CI passes.
-4. `.github/workflows/release-pr.yml` aggregates pending Changesets into the `chore: release packages` PR.
-5. Review release-specific gates and then merge that release PR only after explicit maintainer approval.
-6. The resulting `package.json` / `package-lock.json` / `CHANGELOG.md` change triggers `.github/workflows/release.yml`.
-7. Verify the published npm version and provenance, immutable `vX.Y.Z` tag, matching GitHub Release, and actual tarball installability.
+2. Merge the feature/fix PR after normal review and CI.
+3. `.github/workflows/release-pr.yml` runs on `main` and aggregates pending Changesets into `changeset-release/main`, creating/updating the `chore: release packages` PR.
+4. Review the generated version, `CHANGELOG.md`, lockfile, consumed Changesets, compatibility state, and any release-specific acceptance gates.
+5. Merge the Release PR only after explicit maintainer approval.
+6. `.github/workflows/release.yml` activates publication when the package version changed.
+7. After the workflow succeeds, verify npm/provenance, immutable `vX.Y.Z`, the matching GitHub Release, and practical package installability.
 
-Docs-only or internal changes that do not alter packaged/user-visible release content normally do not require a Changeset.
+Release-specific evidence belongs in the relevant Issue, PR, or release notes rather than permanent version-specific runbooks under `docs/`.
 
-### Release PR creation fallback
+## Release activation guard
 
-The Changesets action can generate/update `changeset-release/main` even when repository-level GitHub Actions settings prohibit Actions from opening a pull request. The characteristic error is:
+`release.yml` is triggered by `main` changes to `package.json`, `package-lock.json`, or `CHANGELOG.md`, but a trigger does not automatically mean a new release.
+
+For normal `push` events, the workflow compares the previous and current `package.json` versions:
+
+- version unchanged → publication is intentionally skipped,
+- version changed → release validation/publication runs,
+- previous version cannot be resolved → checks run conservatively.
+
+This prevents ordinary dependency/script/metadata changes from trying to republish an existing immutable version.
+
+Other activation rules:
+
+- `package.json` with `private: true` disables publication,
+- manual `workflow_dispatch` explicitly activates the release path even when the version comparison would otherwise skip it.
+
+Use manual dispatch only when intentionally exercising/recovering the release workflow.
+
+## Release PR creation fallback
+
+Repository settings can prevent GitHub Actions from opening pull requests even when the workflow has `pull-requests: write`. The characteristic error is:
 
 ```text
 GitHub Actions is not permitted to create or approve pull requests.
 ```
 
-If this occurs:
+If Changesets successfully generated `changeset-release/main` before that error:
 
-1. Confirm the Changesets job successfully generated `changeset-release/main` before the PR-creation failure.
-2. Compare `changeset-release/main` against `main` and verify that the version, generated `CHANGELOG.md`, lockfile, and consumed Changesets are exactly the expected release output.
-3. Open `changeset-release/main` → `main` manually as `chore: release packages` without regenerating or editing the generated release content.
-4. Keep the same release-specific acceptance gates and explicit maintainer-approval requirement before merge.
+1. Compare `changeset-release/main` with `main`.
+2. Confirm the version, generated `CHANGELOG.md`, lockfile, and consumed Changesets are exactly the expected output.
+3. Open `changeset-release/main` → `main` manually as `chore: release packages`.
+4. Apply the same review and explicit-approval gates as an automatically created Release PR.
 
-For future fully automatic Release PR creation, a repository maintainer may enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**. The workflow already requests `contents: write` and `pull-requests: write`; the repository-level switch is independent of those YAML permissions.
+To allow automatic PR creation, a maintainer may enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**.
 
-This PR-creation setting does not alter npm Trusted Publishing/OIDC. Publication is still handled separately by `release.yml` after the release PR is merged.
+## Publication checks
 
-## Release-specific product gates
+When publication is activated, `release.yml` performs the release-critical checks before/after publishing, including:
 
-A Changesets Release PR is not sufficient evidence by itself that a feature release is ready. When an Epic or release-polish Issue defines additional acceptance criteria, complete those gates before merging the release PR. Keep release-specific evidence in the relevant Issue, PR, or release notes rather than a permanent version-specific runbook under `docs/`.
+1. `npm run verify:release-ready`,
+2. `npm audit --audit-level=high`,
+3. Biome/unit/build validation,
+4. packaged CLI smoke validation,
+5. `npm run verify:package`,
+6. existing npm-version lookup,
+7. OIDC `npm publish --access public` only when that immutable version is not already published,
+8. npm metadata and tarball retrieval verification,
+9. immutable Git tag creation,
+10. matching GitHub Release creation.
 
-The repository-wide rule remains: release PR merge requires explicit maintainer instruction; do not enable or perform automatic merge merely because CI is green.
+Package validation must reject Microsoft ZIP/SVG assets, test/development directories, and non-allowlisted top-level content.
 
-## Trusted Publishing contract
+### Idempotent recovery
 
-`.github/workflows/release.yml` runs on a GitHub-hosted Ubuntu runner and grants `id-token: write`. It uses the Node version pinned by `.node-version`.
+The publication workflow is designed to recover from partial completion:
 
-The workflow intentionally does not use `NPM_TOKEN`. npm exchanges the GitHub OIDC identity during `npm publish`.
+- If npm already contains `name@X.Y.Z`, do not republish the immutable version; verify it and continue with any missing GitHub metadata.
+- Registry metadata and tarball propagation are retried before tag/Release creation.
+- If `vX.Y.Z` already exists at the intended commit, it may be reused.
+- If `vX.Y.Z` exists at a different commit, fail rather than moving the tag.
 
-The npm Trusted Publisher is configured for:
+A failed post-publish step should normally be recovered by rerunning the workflow after identifying the failure, not by changing the version or deleting published metadata casually.
+
+## Trusted Publishing configuration
+
+The npm Trusted Publisher must remain aligned with:
 
 - Provider: GitHub Actions
 - Repository: `ShimaBell0619/cloud-arch-icon-browser`
 - Workflow filename: `release.yml`
-- Direct `npm publish`: allowed
-- Stage publish: allowed
 
-The `repository.url` in `package.json` must remain:
+`package.json` must keep the matching repository URL:
 
 ```text
 https://github.com/ShimaBell0619/cloud-arch-icon-browser.git
 ```
 
-The Trusted Publisher must continue to point to the exact workflow filename `release.yml`.
+`release.yml` requires `id-token: write` and intentionally does not use `NPM_TOKEN`.
 
-## Release-time gates
+## Official package compatibility
 
-When publication is activated, `release.yml` performs these checks before and after publishing:
+Before a release that claims support for a newer current Microsoft package:
 
-1. `npm run verify:release-ready`
-2. `npm audit --audit-level=high` — High/Critical findings fail the release
-3. Biome checks and unit tests
-4. production build
-5. packaged CLI smoke test
-6. package-content validation via `npm run verify:package`
-7. existing npm version lookup for idempotent recovery
-8. OIDC `npm publish --access public` when the version is not already published
-9. post-publish registry propagation verification
-10. immutable Git tag creation
-11. GitHub Release creation
-
-Package-content validation rejects development/test directories, ZIP files, SVG assets, and non-allowlisted top-level paths.
-
-### Registry/tarball propagation verification
-
-A successful `npm publish` response does not guarantee that every registry/CDN endpoint is immediately ready. During the `v0.1.0` release, package metadata became visible before the tarball was consistently retrievable.
-
-The workflow therefore verifies both:
-
-- `npm view <name>@<version> version`
-- `npm pack <name>@<version>`
-
-The check retries every 5 seconds for up to 24 attempts (approximately 2 minutes). The workflow does not create the version tag or GitHub Release until both metadata and the actual tarball are available.
-
-This makes release completion correspond to practical installability rather than metadata visibility alone.
-
-## Version, tag, and GitHub Release
-
-`package.json` is the version authority for publication. For version `X.Y.Z`, the release workflow derives the immutable tag `vX.Y.Z`.
-
-The workflow order is:
-
-1. validate the release candidate,
-2. detect or publish `name@X.Y.Z` on npm,
-3. verify registry metadata and tarball availability,
-4. create immutable `vX.Y.Z`,
-5. create the GitHub Release for the same tag.
-
-The workflow never moves an existing version tag. If the tag already exists at a different commit, the release fails.
-
-This order also permits recovery if npm accepts a publish but a later step fails. A rerun detects the existing npm version, skips republishing the immutable version, and continues with verification and any missing GitHub metadata.
-
-## Official package compatibility operations
-
-Before a release that claims compatibility with a newer current Microsoft package:
-
-1. Download the latest official ZIP separately from the Microsoft Learn page.
-2. Do not add the ZIP or Microsoft SVGs to this repository.
+1. Download the latest official ZIP separately from the Microsoft Learn Azure Architecture Icons page.
+2. Keep the ZIP/SVG assets outside the repository.
 3. Run:
 
    ```bash
    npm run verify:official -- /path/to/latest-official.zip
    ```
 
-4. Update `COMPATIBILITY.md` only after successful production-parser verification.
-5. Ensure `Release gate: PASS` accurately reflects the current recorded package before release.
+4. Update `COMPATIBILITY.md` only after successful verification with the production parser/validator.
+5. Ensure the compatibility release gate accurately reflects the recorded package before publishing.
 
-If the official package identity is unchanged from a successful verification already recorded for the same release-maintenance window, a duplicate download/re-run is not required. Re-verify if the package identity/link or relevant Microsoft guidance changes before publication.
+If the official package identity has not changed since a recent successful verification, duplicate verification is not required unless the package/link or relevant Microsoft guidance changed.
 
-The verifier reuses the production `IconPackageSession.open` parser/validator. The official package itself remains outside the repository and npm artifact.
+`.github/workflows/microsoft-icons-watch.yml` checks the Microsoft source periodically and may open/update a maintenance Issue when the package identity or reviewed guidance changes. It must never download/commit Microsoft icon assets, make legal judgments, alter compatibility claims, or change runtime code automatically.
 
-## Microsoft source-change watcher
+## SemVer
 
-`.github/workflows/microsoft-icons-watch.yml` runs weekly and on manual dispatch. It compares the official ZIP identity/link plus normalized fingerprints of the Microsoft Learn `General guidelines` and `Icon terms` sections to the reviewed baseline.
+Before `1.0.0`:
 
-A difference opens or updates a maintenance issue. It never downloads or commits the official ZIP/SVG assets and never changes legal guidance, compatibility claims, or runtime code automatically.
+- patch — compatible fixes/internal improvements,
+- minor — features or breaking changes.
 
-## Historical: v0.1.0 bootstrap
-
-The initial release required a one-time bootstrap because npm Trusted Publishing had to be configured against an existing registry package.
-
-The completed bootstrap sequence was:
-
-1. A disposable worktree changed the package version to `0.0.0` without committing that version to the repository.
-2. `@shimabell06/cloud-arch-icon-browser@0.0.0` was manually published as a public package under the non-default `bootstrap` dist-tag.
-3. npm Trusted Publishing was configured for `ShimaBell0619/cloud-arch-icon-browser` and `release.yml` with direct publish permission.
-4. The `v0.1.0` release-readiness PR was merged.
-5. GitHub Actions published `@shimabell06/cloud-arch-icon-browser@0.1.0` through OIDC with signed provenance.
-6. The immutable `v0.1.0` tag and GitHub Release were created.
-
-The repository never used `0.0.0` as its source-controlled release version. The published `0.0.0` remains historical npm registry metadata.
-
-If the `bootstrap` dist-tag is still present and is no longer useful, a maintainer may remove only the tag:
-
-```bash
-npm dist-tag rm @shimabell06/cloud-arch-icon-browser bootstrap
-```
-
-Do not unpublish the historical version merely to clean up release metadata.
-
-After OIDC publishing has been proven, npm Publishing access should use the strongest practical account/package setting, preferably requiring two-factor authentication while disallowing legacy publish tokens.
+Breaking changes during `0.x` must be called out clearly in the Changeset/CHANGELOG. At and after `1.0.0`, use normal SemVer major/minor/patch semantics.
