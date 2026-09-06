@@ -2,68 +2,53 @@
 
 Repository instructions for Codex and other coding agents.
 
-## Required reading
+## Read before changing code
 
-Before making changes, read:
+Always read:
 
-1. `DESIGN.md` — current product/architecture/security/UX source of truth.
-2. `README.md` — public product contract.
-3. `CONTRIBUTING.md` — contribution workflow.
-4. `COMPATIBILITY.md` when changing ZIP/parser/search compatibility behavior.
-5. `SECURITY.md` when changing ZIP, SVG, localhost server, browser security, or dependency behavior.
-6. `docs/UI_REVIEW.md` when changing browser UI or visual-review infrastructure.
+1. `DESIGN.md` — authoritative product/engineering contract,
+2. `README.md` — public product behavior,
+3. `CONTRIBUTING.md` — development and PR workflow.
 
-`DESIGN.md` is authoritative for the current design. Decision history lives in Issues, PRs, and Git history; the repository intentionally does not maintain a separate ADR set.
+Also read the relevant specialist document when the change touches it:
+
+- `COMPATIBILITY.md` — package/parser compatibility,
+- `SECURITY.md` — ZIP, SVG, localhost server, browser security, or dependency security,
+- `docs/UI_REVIEW.md` — browser UI or visual/Pages review,
+- `docs/RELEASE.md` — release/publication behavior.
+
+Decision history lives in Issues, PRs, releases, CHANGELOG, and Git history. `DESIGN.md` represents the current approved design.
 
 ## Non-negotiable rules
 
-- Do not add Microsoft Azure Architecture Icon ZIPs or SVGs to the repository, tests, screenshots, npm package, or release artifacts.
-- Do not add automatic runtime network requests. The running app must remain local/offline except for user-clicked external links.
-- Do not persist user-selected ZIP/SVG content across sessions.
-- Do not edit, optimize, recolor, sanitize-for-download, rename, or otherwise rewrite original Microsoft SVG bytes.
-- Do not inject untrusted SVG markup into the DOM with `innerHTML` or equivalent APIs.
-- Keep the local server bound to `127.0.0.1` only unless an explicit design change is approved.
-- Do not add hosted-service/backend/database/account functionality unless an explicit design change is approved.
-- Do not add a new distribution channel unless it is explicitly approved and documented.
-- Do not change foundational architecture, security policy, UX policy, publication model, or core technology choices silently.
+- Never add Microsoft Azure Architecture Icon ZIPs/SVGs to the repository, tests, visual baselines, npm package, or workflow/release artifacts.
+- Keep selected ZIP/SVG contents session-local. Do not persist package bytes or file handles.
+- Do not rewrite, optimize, recolor, resize, sanitize-for-download, rename, or otherwise change original SVG bytes used for download.
+- Never inject untrusted SVG markup into the DOM with `innerHTML` or equivalent APIs.
+- Do not add automatic runtime network requests, telemetry, analytics, crash reporting, or package/update checks.
+- Keep the local server bound to `127.0.0.1` unless an explicit design change is approved.
+- Do not add a backend, hosted-service product mode, account/database/cloud-sync feature, or new distribution channel without explicit approval.
+- Do not silently change architecture, security boundaries, major UX/navigation policy, compatibility policy, release/publication policy, or foundational dependencies.
 
-If implementation conflicts with `DESIGN.md`, stop that design change, explain the conflict in the Issue/PR, recommend a resolution, and wait for explicit approval.
+If an implementation request conflicts with `DESIGN.md`, explain the conflict and recommendation in the Issue/PR and wait for explicit approval before changing the contract.
 
 ## Implementation freedom
 
-You may decide normal implementation details that do not change the design contract. Prefer the simplest implementation consistent with `DESIGN.md`.
+Normal implementation details that preserve `DESIGN.md` may be decided pragmatically. Prefer the simplest solution that satisfies the approved scope; avoid speculative abstractions and unrelated future work.
 
-Avoid speculative abstractions and future-proofing that are not required by the approved change or current design.
+Key engineering boundaries:
 
-## UI implementation
+- keep package parsing/validation/category/search/persistence logic React-independent,
+- keep ZIP readers, package sessions, extracted Blobs, and object URLs in the session/resource layer and dispose them deterministically,
+- do not persist derived/package-scoped runtime resources,
+- prefer existing shadcn primitives and keep application composition outside `src/components/ui`,
+- preserve keyboard/focus/responsive behavior,
+- use npm and exact-pin direct dependencies,
+- verify the actual installed/current library API before relying on security-sensitive options.
 
-- Prefer existing shadcn primitives before creating custom primitive components.
-- Keep generated `components/ui` primitives thin.
-- Put application-specific composition outside the primitive layer.
-- Follow the visual direction and prohibited patterns in `DESIGN.md`.
-- Preserve keyboard/focus behavior and responsive behavior.
-- Use semantic design tokens instead of scattering raw colors.
-- For UI-affecting PRs, treat the `UI Review` Playwright screenshots as the standard visual QA artifact.
-- Use the manual GitHub Pages preview only when an interactive cross-device review is useful; it is development infrastructure, not a product distribution mode.
+## Validation
 
-## Domain architecture
-
-- Keep core package parsing, validation, category construction, name parsing, and search logic independent from React.
-- Do not store derived search result arrays or zip reader/session objects in Zustand.
-- Keep package-owned resources in the package session layer and dispose them deterministically.
-- Verify the actual current `@zip.js/zip.js` API before using security/CRC options.
-
-## Dependencies
-
-- Use npm.
-- Pin direct dependency versions exactly.
-- Do not introduce a major/foundational dependency without explicit approval.
-- No CDN/runtime-hosted dependencies.
-- Preserve ESM-only and the Node.js engine range defined by `package.json`.
-
-## Tests and validation
-
-Before declaring work complete, run the checks relevant to the change. The baseline is:
+Run checks relevant to the change. Baseline:
 
 ```bash
 npm run check
@@ -72,31 +57,23 @@ npm test
 npm run build
 ```
 
-For changes affecting the CLI/server or end-to-end flow, run the relevant Playwright/CLI smoke tests as well.
+Run Playwright, CLI/package smoke, package validation, or release-readiness checks when the changed area requires them.
 
-For browser UI changes, inspect the actual screenshots produced by `.github/workflows/ui-review.yml`; do not infer visual correctness from source code or unit tests alone. The workflow must use only project-owned dummy SVG/ZIP fixtures. See `docs/UI_REVIEW.md`.
+For browser UI changes, inspect the actual UI Review screenshots/Pages preview described in `docs/UI_REVIEW.md`; source inspection alone is not visual validation. Test/review fixtures must remain project-owned synthetic ZIP/SVG data.
 
-Core logic must maintain the coverage gates defined in `DESIGN.md`.
-
-Do not use Microsoft assets as test fixtures. Generate project-owned dummy ZIP/SVG fixtures.
+Core coverage must remain at or above the thresholds defined in `DESIGN.md`.
 
 ## Pull requests
 
-- Work from a short-lived branch.
-- PR title follows Conventional Commits.
-- Keep scope aligned with the assigned Issue.
-- Include an appropriate Changeset for release-relevant changes; docs/internal-only changes do not need one unless they alter packaged/user-visible release content.
-- State whether the PR changes `DESIGN.md`.
-- State the validation performed.
-- Confirm no Microsoft assets were added.
-- Confirm no automatic runtime network request was added.
-
-Do not implement unrelated future features in the same PR.
+- Work on a short-lived branch and keep the PR focused on its assigned purpose.
+- Use a Conventional Commit PR title.
+- Include a Changeset for release-relevant/user-visible changes unless the change is genuinely docs/internal-only.
+- State design impact, validation performed, Changeset status, and security/runtime-network impact.
+- Confirm that no Microsoft assets were added.
+- Do not implement unrelated future features in the same PR.
 
 ## Release safety
 
-Before npm publication, verify package contents (`npm pack --dry-run` or equivalent CI validation) so Microsoft assets, local ZIPs, test fixtures, and unrelated files cannot leak into the package.
+Publication uses npm Trusted Publishing/OIDC from GitHub Actions. Do not add a long-lived npm publish token.
 
-Normal publication uses npm Trusted Publishing/OIDC from GitHub Actions; do not add a long-lived npm publish token.
-
-Official-package verification is a maintainer/release task using a locally downloaded Microsoft ZIP. Never commit that ZIP.
+Before publication, package-content validation must prevent Microsoft assets, local ZIPs, test fixtures, and unrelated development files from entering the npm package. Official-package verification always uses a separately downloaded local ZIP and never commits it.
