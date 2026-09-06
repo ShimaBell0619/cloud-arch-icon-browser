@@ -1,11 +1,13 @@
 /** @vitest-environment node */
 
 import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
-import { request } from "node:http";
+import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  APP_INSTANCE_HEADER,
+  CANONICAL_PORT,
   startStaticServer,
   type RunningStaticServer,
 } from "./server.js";
@@ -33,15 +35,21 @@ afterEach(async () => {
 });
 
 describe("startStaticServer", () => {
+  it("defines a stable canonical packaged-runtime port", () => {
+    expect(CANONICAL_PORT).toBe(41731);
+  });
+
   it("serves index.html only on loopback with hardened headers", async () => {
     const { server } = await createFixture();
     const response = await fetch(server.url);
 
     expect(server.url).toBe(`http://127.0.0.1:${server.port}/`);
     expect(server.port).toBeGreaterThan(0);
+    expect(server.reused).toBe(false);
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain("fixture app");
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get(APP_INSTANCE_HEADER)).toBe("1");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     expect(response.headers.get("x-frame-options")).toBe("DENY");
@@ -55,6 +63,53 @@ describe("startStaticServer", () => {
     expect(csp).toContain("style-src 'self'");
     expect(csp).not.toContain("unsafe-eval");
     expect(csp).not.toContain("unsafe-inline");
+  });
+
+  it("reuses an already-running matching app instance", async () => {
+    const { rootDirectory, server: first } = await createFixture();
+    const second = await startStaticServer({
+      rootDirectory,
+      port: first.port,
+    });
+
+    expect(second.reused).toBe(true);
+    expect(second.port).toBe(first.port);
+    expect(second.url).toBe(first.url);
+    await second.close();
+
+    const response = await fetch(first.url);
+    expect(response.status).toBe(200);
+  });
+
+  it("rejects a port owned by another process", async () => {
+    const rootDirectory = await createFixtureRoot();
+    const other = createServer((_request, response) => {
+      response.statusCode = 200;
+      response.end("not this app");
+    });
+
+    await new Promise<void>((resolvePromise, rejectPromise) => {
+      other.once("error", rejectPromise);
+      other.listen({ host: "127.0.0.1", port: 0 }, () => resolvePromise());
+    });
+
+    try {
+      const address = other.address();
+      if (address === null || typeof address === "string") {
+        throw new Error("Unable to determine test server port.");
+      }
+      await expect(
+        startStaticServer({ rootDirectory, port: address.port }),
+      ).rejects.toThrow("already in use by another process");
+    } finally {
+      await new Promise<void>((resolvePromise, rejectPromise) => {
+        other.close((error) => {
+          if (error) rejectPromise(error);
+          else resolvePromise();
+        });
+      });
+      await rm(rootDirectory, { recursive: true, force: true });
+    }
   });
 
   it("supports HEAD without returning a body", async () => {
@@ -143,7 +198,7 @@ describe("startStaticServer", () => {
       );
       await symlink("index.html", join(rootDirectory, "linked.html"));
 
-      await expect(startStaticServer({ rootDirectory })).rejects.toThrow(
+      await expect(startStaticServer({ rootDirectory, port: 0 })).rejects.toThrow(
         "must not contain symbolic links",
       );
     } finally {
@@ -153,6 +208,14 @@ describe("startStaticServer", () => {
 });
 
 async function createFixture(): Promise<Fixture> {
+  const rootDirectory = await createFixtureRoot();
+  const server = await startStaticServer({ rootDirectory, port: 0 });
+  const fixture = { rootDirectory, server };
+  fixtures.push(fixture);
+  return fixture;
+}
+
+async function createFixtureRoot(): Promise<string> {
   const rootDirectory = await mkdtemp(join(tmpdir(), "cloud-arch-server-"));
   await mkdir(join(rootDirectory, "assets"));
   await writeFile(
@@ -165,11 +228,7 @@ async function createFixture(): Promise<Fixture> {
     "console.log('fixture');\n",
     "utf8",
   );
-
-  const server = await startStaticServer({ rootDirectory });
-  const fixture = { rootDirectory, server };
-  fixtures.push(fixture);
-  return fixture;
+  return rootDirectory;
 }
 
 function rawRequest(
