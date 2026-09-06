@@ -96,7 +96,7 @@ This preview is not a supported distribution channel and must preserve the same 
 - Pull requests validate a target-specific Pages build. Same-repository PRs also publish to stable `/pr-N/` preview paths, while fork PRs remain build-only.
 - `main` publishes at the site root and preserves active `pr-*` previews; closing or merging a PR removes its preview.
 
-The operational setup is documented in `docs/PAGES_PREVIEW.md`.
+The operational and visual-review setup is documented in `docs/UI_REVIEW.md`.
 
 ### 2.4 Local server
 
@@ -844,8 +844,7 @@ If Microsoft terms appear materially incompatible with the project's intended us
 - `SECURITY.md`: vulnerability reporting/support policy.
 - `THIRD_PARTY_NOTICES.md`: third-party notices.
 - `docs/RELEASE.md`: release and compatibility operations.
-- `docs/PAGES_PREVIEW.md`: GitHub Pages UI-preview setup and operational boundary.
-- `docs/V0.2.0_VERIFICATION.md`: release-specific `v0.2.0` verification record.
+- `docs/UI_REVIEW.md`: browser UI review and GitHub Pages preview operations.
 - `LICENSE`: MIT license for project code.
 
 The repository intentionally does not maintain a separate ADR set. Decision history lives in Issues, PRs, and Git history while `DESIGN.md` represents the current contract.

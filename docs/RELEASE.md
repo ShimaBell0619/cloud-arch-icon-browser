@@ -25,8 +25,6 @@ Current publication contract:
 
 The current official `Azure_Public_Service_Icons_V24.zip` has passed the production-parser verification recorded in [`COMPATIBILITY.md`](../COMPATIBILITY.md).
 
-Release-specific verification records may live under `docs/`; the `v0.2.0` record is [`V0.2.0_VERIFICATION.md`](./V0.2.0_VERIFICATION.md).
-
 ## Normal release flow
 
 For a user-visible or package-relevant change:
@@ -67,9 +65,7 @@ This PR-creation setting does not alter npm Trusted Publishing/OIDC. Publication
 
 ## Release-specific product gates
 
-A Changesets Release PR is not sufficient evidence by itself that a feature release is ready. When an Epic or release-polish Issue defines additional acceptance criteria, those gates must be recorded before the release PR is merged.
-
-For `v0.2.0`, [`V0.2.0_VERIFICATION.md`](./V0.2.0_VERIFICATION.md) is the release-specific record. In particular, Windows PowerPoint and Excel paste verification for the transparent 512×512 **Copy image** workflow is a manual release blocker and must be completed before the `v0.2.0` Changesets Release PR is merged.
+A Changesets Release PR is not sufficient evidence by itself that a feature release is ready. When an Epic or release-polish Issue defines additional acceptance criteria, complete those gates before merging the release PR. Keep release-specific evidence in the relevant Issue, PR, or release notes rather than a permanent version-specific runbook under `docs/`.
 
 The repository-wide rule remains: release PR merge requires explicit maintainer instruction; do not enable or perform automatic merge merely because CI is green.
 
