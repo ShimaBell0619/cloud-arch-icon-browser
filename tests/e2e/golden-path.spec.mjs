@@ -187,9 +187,7 @@ test("favorites, recent icons, recent searches, and compact view survive package
   await appService.click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
-  await page
-    .getByRole("button", { name: "Add App Service to Tray" })
-    .click();
+  await page.getByRole("button", { name: "Add App Service to Tray" }).click();
 
   await navigation.getByRole("button", { name: "Recent" }).click();
   await expect(
