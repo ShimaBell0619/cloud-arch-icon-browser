@@ -167,12 +167,12 @@ describe("persistence edge cases", () => {
     expect(state.savedSets[0]?.items[0]?.quantity).toBe(3);
 
     const beforeUpdate = state;
-    expect(updateSavedSet(state, "missing", "Name", [{ icon: first, quantity: 1 }])).toBe(
-      state,
-    );
-    expect(updateSavedSet(state, "set-1", "   ", [{ icon: first, quantity: 1 }])).toBe(
-      state,
-    );
+    expect(
+      updateSavedSet(state, "missing", "Name", [{ icon: first, quantity: 1 }]),
+    ).toBe(state);
+    expect(
+      updateSavedSet(state, "set-1", "   ", [{ icon: first, quantity: 1 }]),
+    ).toBe(state);
     expect(updateSavedSet(state, "set-1", "Name", [])).toBe(state);
     expect(deleteSavedSet(state, "missing")).toBe(state);
 
@@ -279,7 +279,9 @@ describe("persistence edge cases", () => {
   it("uses generated identifiers when no Saved Set id is supplied", () => {
     vi.spyOn(Date, "now").mockReturnValue(1234);
     let state = createDefaultPersistedState();
-    state = createSavedSet(state, "Generated", [{ icon: icon(1), quantity: 1 }]);
+    state = createSavedSet(state, "Generated", [
+      { icon: icon(1), quantity: 1 },
+    ]);
     expect(state.savedSets[0]?.id).toBeTruthy();
     expect(state.savedSets[0]?.createdAt).toBe(1234);
     vi.restoreAllMocks();
