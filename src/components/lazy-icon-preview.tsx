@@ -1,6 +1,10 @@
 import { ImageOffIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { IconEntry, IconPackageSession } from "@/core";
+import {
+  observePreviewHost,
+  schedulePreviewWork,
+} from "@/components/preview-scheduler";
 
 interface LazyIconPreviewProps {
   session: IconPackageSession;
@@ -30,40 +34,35 @@ export function LazyIconPreview({
 
   useEffect(() => {
     let cancelled = false;
-    let observer: IntersectionObserver | null = null;
+    let stopObserving = () => undefined;
 
-    const load = async () => {
-      setPreview({ status: "loading", url: null });
+    const load = async (priority = 0) => {
+      if (!cancelled) setPreview({ status: "loading", url: null });
       try {
-        const url = await session.getPreviewUrl(icon.id);
+        const url = await schedulePreviewWork(
+          () => session.getPreviewUrl(icon.id),
+          priority,
+        );
         if (!cancelled) setPreview({ status: "ready", url });
       } catch {
         if (!cancelled) setPreview({ status: "error", url: null });
       }
     };
 
-    if (eager || typeof IntersectionObserver === "undefined") {
-      void load();
+    if (eager) {
+      void load(-1);
     } else {
       const host = hostRef.current;
       if (host) {
-        observer = new IntersectionObserver(
-          (entries) => {
-            if (entries.some((entry) => entry.isIntersecting)) {
-              observer?.disconnect();
-              observer = null;
-              void load();
-            }
-          },
-          { rootMargin: "180px" },
-        );
-        observer.observe(host);
+        stopObserving = observePreviewHost(host, (priority) => {
+          void load(priority);
+        });
       }
     }
 
     return () => {
       cancelled = true;
-      observer?.disconnect();
+      stopObserving();
     };
   }, [eager, icon.id, session]);
 
@@ -73,6 +72,8 @@ export function LazyIconPreview({
   return (
     <div
       ref={hostRef}
+      data-preview-icon-id={icon.id}
+      data-preview-status={preview.status}
       className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-preview-border bg-preview ${hostSize}`}
     >
       {preview.status === "ready" ? (
@@ -80,8 +81,9 @@ export function LazyIconPreview({
           src={preview.url}
           alt={`${icon.displayName} preview`}
           className={`${contentSize} object-contain`}
+          decoding="async"
           draggable={false}
-          loading={eager ? "eager" : "lazy"}
+          loading="eager"
         />
       ) : preview.status === "error" ? (
         <div className="flex flex-col items-center gap-1 text-preview-muted">
