@@ -23,7 +23,7 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: python3 scripts/apply-v02-combined.py
+      - run: python3 scripts/apply-v02-combined-v2.py
       - run: npx biome check --write src/App.tsx src/core/search.ts src/core/search.test.ts src/components/icon-card.tsx src/components/icon-details-dialog.tsx src/components/lazy-icon-preview.tsx src/components/search-autocomplete.tsx src/lib/icon-clipboard.ts src/lib/icon-clipboard.test.ts
       - run: npm run typecheck
       - run: npm test
