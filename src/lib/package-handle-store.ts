@@ -112,7 +112,9 @@ function createIndexedDbStorage(): PackageHandleStorage {
       const database = await openDatabase();
       try {
         const transaction = database.transaction(STORE_NAME, "readonly");
-        const request = transaction.objectStore(STORE_NAME).get(PREVIOUS_PACKAGE_KEY);
+        const request = transaction
+          .objectStore(STORE_NAME)
+          .get(PREVIOUS_PACKAGE_KEY);
         const value = await requestResult<unknown>(request);
         await transactionDone(transaction);
         return isPersistableFileHandle(value) ? value : null;
@@ -153,7 +155,8 @@ function openDatabase(): Promise<IDBDatabase> {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed."));
+    request.onerror = () =>
+      reject(request.error ?? new Error("IndexedDB open failed."));
     request.onblocked = () => reject(new Error("IndexedDB open was blocked."));
   });
 }
@@ -161,7 +164,8 @@ function openDatabase(): Promise<IDBDatabase> {
 function requestResult<T>(request: IDBRequest): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result as T);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed."));
+    request.onerror = () =>
+      reject(request.error ?? new Error("IndexedDB request failed."));
   });
 }
 
@@ -175,7 +179,9 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   });
 }
 
-function isPersistableFileHandle(value: unknown): value is PersistableFileHandle {
+function isPersistableFileHandle(
+  value: unknown,
+): value is PersistableFileHandle {
   return (
     typeof value === "object" &&
     value !== null &&
