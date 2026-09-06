@@ -1,6 +1,6 @@
 # Cloud Arch Icon Browser — Design Contract
 
-Status: current design baseline. The first public release, `v0.1.0`, was completed on 2026-09-06 (JST).
+Status: current design baseline. This document tracks current repository behavior; publication/version state is recorded in `README.md`, `CHANGELOG.md`, and `docs/RELEASE.md`.
 
 This document is the source of truth for the current product, architecture, security, UX, testing, compatibility, and release design. It describes the behavior the repository is expected to preserve now; historical implementation planning is recorded separately near the end of this document.
 
@@ -10,7 +10,7 @@ If implementation pressure conflicts with this document, do not silently change 
 
 Cloud Arch Icon Browser is a small local tool for browsing the official Microsoft Azure Architecture Icons package.
 
-The tool makes a user-downloaded official ZIP easier to navigate, search, preview, and download from without redistributing Microsoft assets.
+The tool makes a user-downloaded official ZIP easier to navigate, search, preview, copy into compatible Office workflows, and download from without redistributing Microsoft assets.
 
 The project is independent and must not imply Microsoft affiliation, endorsement, sponsorship, or official status.
 
@@ -44,7 +44,7 @@ The following are outside the current product baseline and require an explicit d
 - Automatic download of the Microsoft icon package.
 - Automatic runtime check for the latest Microsoft package.
 - Account system, backend database, cloud storage, or telemetry.
-- PNG conversion or other asset conversion.
+- Raster download/export formats beyond the transient clipboard PNG copy.
 - SVG editing.
 - Bulk selection or bulk download.
 - Persistent package selection across reloads or sessions.
@@ -387,9 +387,9 @@ Normalization makes inputs such as these behave similarly:
 
 Ranking priority:
 
-1. normalized exact display-name match,
-2. display-name prefix match,
-3. display-name substring match,
+1. normalized exact match against display name, original filename, or category path,
+2. prefix match against those same fields,
+3. substring match against those same fields,
 4. Fuse fuzzy results.
 
 Fuse weighting target:
@@ -417,7 +417,7 @@ Primary palette direction:
 
 Use semantic design tokens such as accent, hover, soft accent, focus ring, borders, foreground, muted foreground, and surfaces rather than one raw blue everywhere.
 
-Dark mode follows `prefers-color-scheme`. There is no manual theme switch in the current baseline.
+Theme defaults to `System`, follows `prefers-color-scheme` in that mode, and also supports explicit persisted `Light` and `Dark` selections.
 
 Avoid:
 
@@ -711,13 +711,14 @@ Use React Testing Library for important interaction boundaries rather than exhau
 
 Playwright covers the golden path using only project-owned dummy ZIP/SVG fixtures:
 
-1. start the local app,
-2. upload a dummy ZIP,
-3. browse icons/categories,
-4. search,
-5. open the details Dialog,
-6. download an SVG and verify the downloaded bytes,
-7. verify key keyboard/focus behavior.
+1. start the local app and upload a dummy ZIP,
+2. browse All icons and explicit category filters,
+3. search with keyboard autocomplete,
+4. exercise Favorites, Recent, Grid/Compact, theme, and persistence boundaries,
+5. open the centered details Dialog and verify focus/Escape restoration,
+6. verify transparent 512×512 PNG clipboard behavior and denied-permission feedback,
+7. download an SVG and verify the original bytes/filename,
+8. exercise representative narrow/mobile navigation and Dialog containment.
 
 Automated axe checks cover key screens.
 
@@ -844,6 +845,7 @@ If Microsoft terms appear materially incompatible with the project's intended us
 - `THIRD_PARTY_NOTICES.md`: third-party notices.
 - `docs/RELEASE.md`: release and compatibility operations.
 - `docs/PAGES_PREVIEW.md`: GitHub Pages UI-preview setup and operational boundary.
+- `docs/V0.2.0_VERIFICATION.md`: release-specific `v0.2.0` verification record.
 - `LICENSE`: MIT license for project code.
 
 The repository intentionally does not maintain a separate ADR set. Decision history lives in Issues, PRs, and Git history while `DESIGN.md` represents the current contract.
