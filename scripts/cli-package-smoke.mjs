@@ -102,14 +102,13 @@ try {
     "utf8",
   );
 
-  // CI runs npm ci before this smoke check, so production dependencies are
-  // already warm in npm's cache. Keep the isolated tarball install offline to
-  // avoid registry latency, and allow extra time on Windows where extraction
-  // and antivirus scanning can make the temporary install substantially slower.
+  // Prefer npm's warm CI cache but retain registry fallback because installing
+  // the isolated tarball may still need package metadata that npm ci did not
+  // cache. Windows gets extra time for extraction and antivirus scanning.
   const installResult = runNpm(
     [
       "install",
-      "--offline",
+      "--prefer-offline",
       "--ignore-scripts",
       "--no-audit",
       "--no-fund",
