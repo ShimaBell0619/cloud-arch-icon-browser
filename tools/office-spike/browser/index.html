@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Office Interop Spike #45</title>
+    <link rel="stylesheet" href="./spike.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Cloud Arch Icon Browser · Issue #45</p>
+        <h1>Windows PowerPoint interoperability harness</h1>
+        <p>
+          Uses only runtime-generated synthetic artwork. No Microsoft icon assets are loaded,
+          stored, or transmitted.
+        </p>
+      </header>
+
+      <section>
+        <h2>Environment</h2>
+        <dl id="environment"></dl>
+      </section>
+
+      <section>
+        <h2>Clipboard tests</h2>
+        <p>
+          Click a test, then either paste once into desktop PowerPoint or run the PowerShell
+          clipboard inspector documented in <code>tools/office-spike/README.md</code>.
+        </p>
+        <div class="test-grid">
+          <article>
+            <h3>A0 · Single PNG baseline</h3>
+            <p>One <code>ClipboardItem</code> with one <code>image/png</code> representation.</p>
+            <button type="button" data-action="single-png">Copy single PNG</button>
+          </article>
+          <article>
+            <h3>A1 · Multiple native items</h3>
+            <p>Three separate <code>ClipboardItem</code> objects, each containing PNG.</p>
+            <button type="button" data-action="multi-png">Copy 3 PNG items</button>
+          </article>
+          <article>
+            <h3>A2 · HTML multi-image</h3>
+            <p>One HTML clipboard item containing three embedded PNG images.</p>
+            <button type="button" data-action="html-images">Copy HTML with 3 images</button>
+          </article>
+          <article>
+            <h3>C1 · SVG + PNG fallback</h3>
+            <p>One clipboard item exposing SVG first and PNG as a fallback representation.</p>
+            <button type="button" data-action="svg-png">Copy SVG + PNG</button>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Direct drag tests</h2>
+        <p>
+          Drag each tile directly into desktop PowerPoint. The first two use standard
+          <code>File</code>/<code>DataTransfer</code> representations. The third is explicitly
+          Chromium-specific exploratory behavior and must not become a production dependency
+          unless the spike proves it reliable.
+        </p>
+        <div class="drag-grid">
+          <div class="drag-tile" draggable="true" data-drag="png-file">
+            PNG file drag
+          </div>
+          <div class="drag-tile" draggable="true" data-drag="svg-file">
+            SVG file drag
+          </div>
+          <div class="drag-tile" draggable="true" data-drag="chromium-download-url">
+            Chromium DownloadURL
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Harness log</h2>
+        <pre id="log" aria-live="polite"></pre>
+        <button type="button" data-action="copy-diagnostics">Copy diagnostics JSON</button>
+      </section>
+    </main>
+    <script type="module" src="./spike.js"></script>
+  </body>
+</html>
