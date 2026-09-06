@@ -4,6 +4,7 @@ import {
   DownloadIcon,
   FileCode2Icon,
   LoaderCircleIcon,
+  PlusIcon,
   StarIcon,
   XIcon,
 } from "lucide-react";
@@ -23,6 +24,8 @@ interface IconDetailsDialogProps {
   restoreFocusTo: HTMLElement | null;
   favorite: boolean;
   onToggleFavorite: () => void;
+  onAddToTray?: (icon: IconEntry) => void;
+  onUsed?: (icon: IconEntry) => void;
   onClose: () => void;
 }
 
@@ -34,6 +37,8 @@ export function IconDetailsDialog({
   restoreFocusTo,
   favorite,
   onToggleFavorite,
+  onAddToTray,
+  onUsed,
   onClose,
 }: IconDetailsDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -83,6 +88,7 @@ export function IconDetailsDialog({
     setPending("image");
     try {
       await copyIconAsPng(session, icon);
+      onUsed?.(icon);
       setNotice({ kind: "success", message: "Copied 512×512 PNG image." });
     } catch (error) {
       setNotice({ kind: "error", message: clipboardErrorMessage(error) });
@@ -97,6 +103,7 @@ export function IconDetailsDialog({
     setPending("svg");
     try {
       await copySvgText(session, icon);
+      onUsed?.(icon);
       setNotice({ kind: "success", message: "Copied original SVG text." });
     } catch (error) {
       setNotice({ kind: "error", message: clipboardErrorMessage(error) });
@@ -167,6 +174,18 @@ export function IconDetailsDialog({
               </h2>
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              {onAddToTray ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Add ${icon.displayName} to Tray`}
+                  title="Add to Tray"
+                  onClick={() => onAddToTray(icon)}
+                >
+                  <PlusIcon aria-hidden="true" />
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="ghost"
