@@ -1,0 +1,408 @@
+name: Temporary finish PR 54
+
+on:
+  push:
+    branches:
+      - feat/46-47-tray-saved-sets
+
+permissions:
+  contents: write
+
+jobs:
+  finish:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: feat/46-47-tray-saved-sets
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - name: Finish Tray, Saved Sets, tests, and design contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'{path}: replacement not found: {old[:100]}')
+              p.write_text(text.replace(old, new, 1))
+
+          # App wiring: quick panel + rename.
+          replace_once(
+              'src/App.tsx',
+              'import { TrayWorkspace } from "@/components/tray-workspace";',
+              'import { TrayQuickPanel } from "@/components/tray-quick-panel";\nimport { TrayWorkspace } from "@/components/tray-workspace";',
+          )
+          replace_once(
+              'src/App.tsx',
+              '  recordRecentSearch,\n  removeFavorite,',
+              '  recordRecentSearch,\n  removeFavorite,\n  renameSavedSet,',
+          )
+          replace_once(
+              'src/App.tsx',
+              '  const [navigationSheetOpen, setNavigationSheetOpen] = useState(false);\n  const [categoriesExpanded, setCategoriesExpanded] = useState(true);',
+              '  const [navigationSheetOpen, setNavigationSheetOpen] = useState(false);\n  const [trayPanelOpen, setTrayPanelOpen] = useState(false);\n  const [categoriesExpanded, setCategoriesExpanded] = useState(true);',
+          )
+          replace_once(
+              'src/App.tsx',
+              '  const showTray = () => {\n    setWorkspaceView("tray");',
+              '  const showTray = () => {\n    setTrayPanelOpen(false);\n    setWorkspaceView("tray");',
+          )
+          replace_once(
+              'src/App.tsx',
+              '''  const updateSetFromTray = (set: SavedSetRecord) => {
+    if (!trayItems.length) return;''',
+              '''  const renameSet = (set: SavedSetRecord, name: string): boolean => {
+    if (!name.trim()) return false;
+    onPersistedStateChange((state) => renameSavedSet(state, set.id, name));
+    setDropNotice(`Renamed Saved Set to ${name.trim()}.`);
+    return true;
+  };
+
+  const updateSetFromTray = (set: SavedSetRecord) => {
+    if (!trayItems.length) return;''',
+          )
+          replace_once(
+              'src/App.tsx',
+              '              aria-label={`Open Tray, ${trayTotalQuantity(trayItems)} objects`}\n              onClick={showTray}',
+              '              aria-label={`Open Tray panel, ${trayTotalQuantity(trayItems)} objects`}\n              onClick={() => setTrayPanelOpen(true)}',
+          )
+          replace_once(
+              'src/App.tsx',
+              '              onSaveAsSet={saveTrayAsSet}\n              onUpdateSetFromTray={updateSetFromTray}',
+              '              onSaveAsSet={saveTrayAsSet}\n              onRenameSet={renameSet}\n              onUpdateSetFromTray={updateSetFromTray}',
+          )
+          replace_once(
+              'src/App.tsx',
+              '''      <IconDetailsDialog
+        session={session}''',
+              '''      <TrayQuickPanel
+        open={trayPanelOpen}
+        session={session}
+        items={trayItems}
+        onClose={() => setTrayPanelOpen(false)}
+        onSetQuantity={(item, quantity) =>
+          onTrayItemsChange((current) =>
+            setTrayItemQuantity(
+              current,
+              item.reference.canonicalPath,
+              quantity,
+            ),
+          )
+        }
+        onRemove={(item) =>
+          onTrayItemsChange((current) =>
+            removeTrayItem(current, item.reference.canonicalPath),
+          )
+        }
+        onViewFullTray={showTray}
+      />
+
+      <IconDetailsDialog
+        session={session}''',
+          )
+
+          # Persistence rename helper that preserves unresolved set members.
+          replace_once(
+              'src/core/persistence.ts',
+              '''export function deleteSavedSet(
+  state: PersistedState,
+  id: string,
+): PersistedState {''',
+              '''export function renameSavedSet(
+  state: PersistedState,
+  id: string,
+  name: string,
+  updatedAt = Date.now(),
+): PersistedState {
+  const normalizedName = normalizeSavedSetName(name);
+  if (!normalizedName) return state;
+
+  let changed = false;
+  const savedSets = state.savedSets.map((set) => {
+    if (set.id !== id) return set;
+    changed = true;
+    return { ...set, name: normalizedName, updatedAt };
+  });
+  return changed ? { ...state, savedSets } : state;
+}
+
+export function deleteSavedSet(
+  state: PersistedState,
+  id: string,
+): PersistedState {''',
+          )
+          replace_once(
+              'src/core/index.ts',
+              '  removeFavorite,\n  resolveSavedSet,',
+              '  removeFavorite,\n  renameSavedSet,\n  resolveSavedSet,',
+          )
+
+          # Saved Set rename/inspection UI.
+          replace_once(
+              'src/components/tray-workspace.tsx',
+              '  onSaveAsSet: (name: string) => boolean;\n  onUpdateSetFromTray: (set: SavedSetRecord) => void;',
+              '  onSaveAsSet: (name: string) => boolean;\n  onRenameSet: (set: SavedSetRecord, name: string) => boolean;\n  onUpdateSetFromTray: (set: SavedSetRecord) => void;',
+          )
+          replace_once(
+              'src/components/tray-workspace.tsx',
+              '  onSaveAsSet,\n  onUpdateSetFromTray,',
+              '  onSaveAsSet,\n  onRenameSet,\n  onUpdateSetFromTray,',
+          )
+          replace_once(
+              'src/components/tray-workspace.tsx',
+              '  const [setName, setSetName] = useState("");\n  const [notice, setNotice] = useState<string | null>(null);',
+              '  const [setName, setSetName] = useState("");\n  const [renamingSetId, setRenamingSetId] = useState<string | null>(null);\n  const [renameName, setRenameName] = useState("");\n  const [notice, setNotice] = useState<string | null>(null);',
+          )
+          replace_once(
+              'src/components/tray-workspace.tsx',
+              '''                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button''',
+              '''                {renamingSetId === set.id ? (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="text"
+                      value={renameName}
+                      maxLength={80}
+                      aria-label={`Rename Saved Set ${set.name}`}
+                      className="h-9 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                      onChange={(event) => setRenameName(event.currentTarget.value)}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter") return;
+                        if (onRenameSet(set, renameName)) {
+                          setNotice(`Renamed Saved Set to ${renameName.trim()}.`);
+                          setRenamingSetId(null);
+                          setRenameName("");
+                        } else {
+                          setNotice("Enter a non-empty Saved Set name.");
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        if (onRenameSet(set, renameName)) {
+                          setNotice(`Renamed Saved Set to ${renameName.trim()}.`);
+                          setRenamingSetId(null);
+                          setRenameName("");
+                        } else {
+                          setNotice("Enter a non-empty Saved Set name.");
+                        }
+                      }}
+                    >
+                      Save name
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setRenamingSetId(null);
+                        setRenameName("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button''',
+          )
+          replace_once(
+              'src/components/tray-workspace.tsx',
+              '''                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!items.length}
+                    onClick={() => onUpdateSetFromTray(set)}
+                  >
+                    Update
+                  </Button>''',
+              '''                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Rename Saved Set ${set.name}`}
+                    onClick={() => {
+                      setRenamingSetId(set.id);
+                      setRenameName(set.name);
+                    }}
+                  >
+                    Rename
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!items.length}
+                    onClick={() => onUpdateSetFromTray(set)}
+                  >
+                    Update
+                  </Button>''',
+          )
+          replace_once(
+              'src/components/tray-workspace.tsx',
+              '''                </div>
+              </article>
+            ))}''',
+              '''                </div>
+                <details className="mt-3 rounded-xl border border-border px-3 py-2 text-xs">
+                  <summary className="cursor-pointer font-medium text-muted-foreground">
+                    View contents
+                  </summary>
+                  <ul className="mt-2 space-y-1 text-foreground">
+                    {set.items.map((item) => (
+                      <li key={item.canonicalPath} className="flex justify-between gap-3">
+                        <span className="min-w-0 truncate">{item.displayName}</span>
+                        <span className="shrink-0 tabular-nums">×{item.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </article>
+            ))}''',
+          )
+
+          # Persistence edge coverage for rename no-op/preservation.
+          replace_once(
+              'src/core/persistence.edge.test.ts',
+              '  recordRecentIcon,\n  resolveSavedSet,',
+              '  recordRecentIcon,\n  renameSavedSet,\n  resolveSavedSet,',
+          )
+          replace_once(
+              'src/core/persistence.edge.test.ts',
+              '''    expect(state.savedSets[0]?.items[0]?.quantity).toBe(3);
+
+    const beforeUpdate = state;''',
+              '''    expect(state.savedSets[0]?.items[0]?.quantity).toBe(3);
+
+    const itemsBeforeRename = state.savedSets[0]?.items;
+    expect(renameSavedSet(state, "missing", "Other", 15)).toBe(state);
+    expect(renameSavedSet(state, "set-1", "   ", 15)).toBe(state);
+    state = renameSavedSet(state, "set-1", "Renamed", 15);
+    expect(state.savedSets[0]?.name).toBe("Renamed");
+    expect(state.savedSets[0]?.updatedAt).toBe(15);
+    expect(state.savedSets[0]?.items).toEqual(itemsBeforeRename);
+
+    const beforeUpdate = state;''',
+          )
+
+          # E2E for quick panel, session-only Tray, Saved Set persistence/rename/inspection.
+          e2e = Path('tests/e2e/golden-path.spec.mjs')
+          text = e2e.read_text()
+          marker = '''test("workspace navigation and theme preferences survive reload without reopening the package", async ({
+  page,
+}) => {'''
+          new_test = '''test("Tray quick panel edits in place and Saved Sets persist with rename", async ({
+  page,
+}) => {
+  await loadPackage(page);
+
+  await page.getByRole("button", { name: "Add App Service to Tray" }).click();
+  await page.getByRole("button", { name: "Open Tray panel, 1 objects" }).click();
+  const quickTray = page.getByRole("dialog", { name: "Tray" });
+  await expect(quickTray).toBeVisible();
+  await expect(quickTray).toContainText("App Service");
+  await quickTray
+    .getByRole("button", { name: "Increase App Service quantity" })
+    .click();
+  await expect(quickTray).toContainText("2 total objects");
+  await quickTray.getByRole("button", { name: "View full Tray" }).click();
+  await expect(quickTray).not.toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tray", exact: true })).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Saved Set name" }).fill("Web API");
+  await page.getByRole("button", { name: "Save as Set" }).click();
+  await page.getByRole("button", { name: "Rename Saved Set Web API" }).click();
+  const rename = page.getByRole("textbox", { name: "Rename Saved Set Web API" });
+  await rename.fill("Web API renamed");
+  await page.getByRole("button", { name: "Save name" }).click();
+  await expect(page.getByText("Web API renamed", { exact: true })).toBeVisible();
+  await page.getByText("View contents", { exact: true }).click();
+  await expect(page.getByText("App Service", { exact: true })).toBeVisible();
+  await expect(page.getByText("×2", { exact: true })).toBeVisible();
+
+  await page.reload();
+  await page.getByLabel("Choose icon package ZIP").setInputFiles(fixture);
+  await page.getByRole("searchbox", { name: "Search icons" }).waitFor();
+  await page.getByRole("button", { name: "Open Tray panel, 0 objects" }).click();
+  const emptyQuickTray = page.getByRole("dialog", { name: "Tray" });
+  await expect(emptyQuickTray).toContainText("Tray is empty");
+  await emptyQuickTray.getByRole("button", { name: "View full Tray" }).click();
+  await expect(page.getByText("Web API renamed", { exact: true })).toBeVisible();
+});
+
+'''
+          if marker not in text:
+              raise SystemExit('E2E insertion marker not found')
+          e2e.write_text(text.replace(marker, new_test + marker, 1))
+
+          # DESIGN contract for Tray / Saved Sets / recently-used behavior.
+          design = Path('DESIGN.md')
+          text = design.read_text()
+          replacements = {
+          '''- SVG editing or bulk operations,''': '''- SVG editing, diagram-canvas/project management, or Office multi-object bulk copy/export; Tray multi-select is an approved collection workflow,''',
+          '''Core package parsing, validation, path handling, display-name parsing, category construction, search ranking, persistence parsing/migration, and durable icon matching remain React-independent.''': '''Core package parsing, validation, path handling, display-name parsing, category construction, search ranking, persistence parsing/migration, durable icon matching, Tray operations, Saved Set validation/reconciliation, and usage aggregation remain React-independent.''',
+          '''- Successful replacement swaps sessions, then deterministically disposes the previous session and revokes its object URLs.''': '''- Successful replacement re-matches session Tray entries conservatively against the new package while preserving matched quantity/order and dropping unmatched active items with a notice; it then deterministically disposes the previous session and revokes its object URLs.''',
+          '''- recently opened icon references,
+- recent search strings.''': '''- recently used icon references,
+- recent search strings,
+- user-defined Saved Sets containing durable icon references, quantity, order, name/id, and timestamps,
+- bounded local icon-usage counters/recency metadata used only for shortcuts.''',
+          '''- Recent icons: 50, newest first, de-duplicated by durable identity.
+- Recent searches: 10, trimmed and case-insensitively de-duplicated.
+- Favorites: no automatic count limit.''': '''- Recent icons: 50, newest first, de-duplicated by durable identity. Recent means meaningful use such as successful Copy or Tray add; merely opening details is not usage.
+- Recent searches: 10, trimmed and case-insensitively de-duplicated.
+- Usage-stat records: 200 maximum, locally derived and never used to change search ranking.
+- Saved Set names: 80 characters maximum; Saved Set icon members preserve durable identity, quantity, and order.
+- Favorites: no automatic count limit.
+
+Persistence schema v2 changes Recent from details-open history to recently-used history. Migration from v1 intentionally does not relabel old details-open records as usage; v1 Recent starts clean under v2 while Favorites/preferences/recent searches are preserved.''',
+          '''- collapsible left sidebar with `All icons`, `Favorites`, `Recent`, and `Categories`,''': '''- collapsible left sidebar with `All icons`, `Favorites`, `Recent`, `Tray`, and `Categories`,''',
+          '''### Favorites, Recent, and views
+
+- Favorites and recently opened icons use only the durable identity metadata described above.
+- Recent means recently opened icon details, not recent search strings.
+- Grid is the default; Grid/Compact is persisted.
+- Card body opens details; Favorite is a separate accessible control.
+- `Copy` is the primary quick action, with touch/keyboard accessibility preserved.''': '''### Favorites, Recent, Tray, Saved Sets, and views
+
+- Favorites are explicit user-curated single-icon shortcuts and use only durable identity metadata.
+- Recent means recently used icons, not details-open history or recent search strings. Successful Copy and Tray add record usage; opening details alone does not.
+- Frequently used shortcuts are computed from bounded local usage statistics and may appear on the empty/global All-icons surface. They never alter exact/prefix/substring/fuzzy search ranking.
+- There is exactly one active Tray. It is React session state, not persisted state: reload/restart clears it. Duplicate durable icons merge into one ordered row with quantity `×N`.
+- The sidebar opens the full Tray workspace. A continuously reachable `Tray N` affordance opens a lightweight quick panel so users can inspect/change quantity/remove items without leaving search results; dragging a card onto that affordance is an optional desktop convenience, never the only Add path.
+- Temporary Select mode collects multiple currently displayed icons into Tray and resets when the material result scope changes.
+- Saved Sets are user-defined reusable Tray combinations persisted as lightweight metadata only. They support create, rename, update, delete, inspect, `Add to Tray`, and `Replace Tray`; unresolved members stay stored and are reported rather than silently deleted.
+- Saved Set sharing uses an explicit versioned Clipboard text payload (`cloud-arch-icon-browser/saved-set`, schema version 1). Clipboard input is untrusted and must validate before import/application; no ZIP/SVG/generated bytes are included.
+- Grid is the default; Grid/Compact is persisted.
+- Card body opens details; Favorite and Add-to-Tray are separate accessible controls. `Copy` remains the primary single-icon quick action.'''
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'DESIGN replacement not found: {old[:100]}')
+              text = text.replace(old, new, 1)
+          design.write_text(text)
+          PY
+      - run: npx biome check --write src/App.tsx src/components/tray-workspace.tsx src/components/tray-quick-panel.tsx src/core/index.ts src/core/persistence.ts src/core/persistence.edge.test.ts tests/e2e/golden-path.spec.mjs
+      - run: npm run check
+      - run: npm run typecheck
+      - run: npm test
+      - name: Commit finished implementation
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/components/tray-workspace.tsx src/components/tray-quick-panel.tsx src/core/index.ts src/core/persistence.ts src/core/persistence.edge.test.ts tests/e2e/golden-path.spec.mjs DESIGN.md
+          git commit -m "feat: complete Tray and Saved Set workflows"
+          git push origin HEAD:feat/46-47-tray-saved-sets
