@@ -1,7 +1,13 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
 import {
   type IconCategory,
@@ -10,6 +16,7 @@ import {
   IconSearchIndex,
   type PackageMetadata,
   type PackageProblem,
+  PERSISTENCE_KEY,
 } from "@/core";
 
 const icons: readonly IconEntry[] = [
@@ -137,6 +144,12 @@ async function loadDummyPackage(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole("searchbox", { name: "Search icons" });
 }
 
+beforeEach(() => {
+  window.localStorage.clear();
+  delete document.documentElement.dataset.theme;
+  document.documentElement.style.removeProperty("color-scheme");
+});
+
 describe("icon browser UI", () => {
   it("starts with a focused local package picker and manual Microsoft link", () => {
     render(<App />);
@@ -179,6 +192,79 @@ describe("icon browser UI", () => {
     ).toBeVisible();
   });
 
+  it("exposes workspace destinations without populating Favorites or Recent early", async () => {
+    const user = userEvent.setup();
+    installPackageOpenMock();
+    render(<App />);
+    await loadDummyPackage(user);
+
+    const navigation = screen.getByRole("navigation", { name: "Workspace" });
+    expect(
+      within(navigation).getByRole("button", { name: "All icons" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      within(navigation).getByRole("button", { name: "Favorites" }),
+    ).toBeVisible();
+    expect(
+      within(navigation).getByRole("button", { name: "Recent" }),
+    ).toBeVisible();
+    expect(
+      within(navigation).getByRole("button", { name: "Categories" }),
+    ).toBeVisible();
+
+    await user.click(
+      within(navigation).getByRole("button", { name: "Favorites" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Favorites" }),
+    ).toBeVisible();
+    expect(
+      within(navigation).getByRole("button", { name: "Favorites" }),
+    ).toHaveAttribute("aria-current", "page");
+
+    await user.click(
+      within(navigation).getByRole("button", { name: "Recent" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Recent" }),
+    ).toBeVisible();
+
+    await user.click(
+      within(navigation).getByRole("button", { name: "All icons" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "App Service, Compute" }),
+    ).toBeVisible();
+  });
+
+  it("persists sidebar collapse and explicit theme preferences", async () => {
+    const user = userEvent.setup();
+    installPackageOpenMock();
+    render(<App />);
+    await loadDummyPackage(user);
+
+    await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(
+      screen.getByRole("button", { name: "Expand sidebar" }),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Dark theme" }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+
+    const stored = JSON.parse(
+      window.localStorage.getItem(PERSISTENCE_KEY) ?? "null",
+    ) as {
+      preferences?: { sidebarCollapsed?: boolean; theme?: string };
+    } | null;
+    expect(stored?.preferences).toMatchObject({
+      sidebarCollapsed: true,
+      theme: "dark",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Light theme" }));
+    expect(document.documentElement.dataset.theme).toBe("light");
+  });
+
   it("browses recursive categories and preserves the query when scope changes", async () => {
     const user = userEvent.setup();
     installPackageOpenMock();
@@ -194,7 +280,7 @@ describe("icon browser UI", () => {
     expect(
       screen.getByRole("button", { name: "Blob Storage, Storage" }),
     ).toBeVisible();
-    expect(screen.getByRole("button", { name: /^All/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "All icons" })).toHaveAttribute(
       "aria-current",
       "page",
     );

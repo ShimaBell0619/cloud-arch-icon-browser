@@ -469,33 +469,40 @@ A fake percentage progress bar is not required.
 
 Desktop:
 
-- fixed-width left category sidebar,
-- sticky search/action toolbar,
+- fixed left workspace sidebar with top-level `All icons`, `Favorites`, `Recent`, and `Categories` destinations,
+- sidebar expanded by default and collapsible to a compact icon rail; the collapsed preference persists through the approved UI persistence layer,
+- categories expand inside the full sidebar; selecting a category scopes the icon results,
+- sticky search-first toolbar,
 - responsive icon grid.
+
+`Favorites` and `Recent` may exist as navigation placeholders until their data experience is connected by the dedicated v0.2.0 feature work. Do not duplicate or prematurely render their persistence model in the navigation issue.
 
 Narrow viewport:
 
-- category navigation becomes a Drawer/Sheet,
+- the desktop sidebar/rail is replaced by a navigation Drawer/Sheet,
+- the sheet contains the top-level destinations, category tree, secondary package controls, and theme control,
 - grid adapts without horizontal breakage,
 - dialogs fit within the viewport.
 
-Toolbar priority:
+Search remains the dominant workspace control. Result count remains nearby supporting information. Loaded ZIP filename/icon count/category count and `Change package` remain visually secondary in navigation surfaces rather than competing with search.
 
-1. search,
-2. result count,
-3. `Change package`.
+Theme behavior:
 
-Loaded ZIP filename/icon count/category count are useful but visually secondary.
+- users can explicitly choose `System`, `Light`, or `Dark`,
+- the preference persists through the approved UI persistence layer,
+- `System` follows the operating-system color-scheme preference and reacts to changes while the app is open,
+- only the preference is persisted; the resolved light/dark value is runtime UI state.
 
 ### 8.7 Category tree
 
 - Single category selection.
-- `All` selected by default after successful load.
-- Top-level folders visible initially.
+- The top-level `All icons` workspace destination is selected by default after successful load.
+- Top-level folders visible initially when `Categories` is expanded.
 - Child folders collapsed initially.
 - Sibling folders alphabetical.
-- Clicking category label selects it.
+- Clicking category label selects it and returns the workspace to icon results scoped to that category.
 - Chevron controls expand/collapse.
+- The workspace navigation owns the global `All icons` destination; category-tree instances may omit their legacy `All` row to avoid duplicate navigation.
 
 The main icon grid remains flat; it is not grouped by category.
 

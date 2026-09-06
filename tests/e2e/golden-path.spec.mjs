@@ -91,6 +91,46 @@ test("loads a local package, browses, searches, opens details, and downloads ori
   await expect(appService).toBeFocused();
 });
 
+test("workspace navigation preferences survive reload without reopening the package", async ({
+  page,
+}) => {
+  await loadPackage(page);
+
+  const navigation = page.getByRole("navigation", { name: "Workspace" });
+  await expect(
+    navigation.getByRole("button", { name: "All icons" }),
+  ).toHaveAttribute("aria-current", "page");
+
+  await navigation.getByRole("button", { name: "Favorites" }).click();
+  await expect(page.getByRole("heading", { name: "Favorites" })).toBeVisible();
+  await navigation.getByRole("button", { name: "Recent" }).click();
+  await expect(page.getByRole("heading", { name: "Recent" })).toBeVisible();
+  await navigation.getByRole("button", { name: "All icons" }).click();
+
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(
+    page.getByRole("button", { name: "Expand sidebar" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Dark theme" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  const preferences = await page.evaluate(() => {
+    const raw = localStorage.getItem("cloud-arch-icon-browser:state");
+    return raw ? JSON.parse(raw).preferences : null;
+  });
+  expect(preferences).toMatchObject({ sidebarCollapsed: true, theme: "dark" });
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Choose ZIP" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  await page.getByLabel("Choose icon package ZIP").setInputFiles(fixture);
+  await page.getByRole("searchbox", { name: "Search icons" }).waitFor();
+  await expect(
+    page.getByRole("button", { name: "Expand sidebar" }),
+  ).toBeVisible();
+});
+
 test("key screens have no automatically detectable WCAG A/AA violations", async ({
   page,
 }) => {

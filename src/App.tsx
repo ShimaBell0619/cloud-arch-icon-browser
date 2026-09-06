@@ -1,20 +1,33 @@
 import {
   AlertCircleIcon,
   ArrowUpRightIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  Clock3Icon,
   FolderArchiveIcon,
   FolderTreeIcon,
+  LayoutGridIcon,
   LoaderCircleIcon,
+  MenuIcon,
+  MonitorIcon,
+  MoonIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
   RefreshCwIcon,
   SearchIcon,
+  StarIcon,
+  SunIcon,
   UploadIcon,
   XIcon,
 } from "lucide-react";
 import {
   type ChangeEvent,
   type DragEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -25,10 +38,16 @@ import { IconDetailsDialog } from "@/components/icon-details-dialog";
 import { LazyIconPreview } from "@/components/lazy-icon-preview";
 import { Button } from "@/components/ui/button";
 import {
+  createDefaultPersistedState,
   type IconCategory,
   type IconEntry,
   IconPackageSession,
+  loadPersistedState,
   type PackageProblem,
+  type PersistedPreferences,
+  savePersistedState,
+  setPersistedPreferences,
+  type ThemePreference,
 } from "@/core";
 import { choosePackageFile } from "@/lib/package-file-picker";
 import { version } from "../package.json";
@@ -37,6 +56,7 @@ const PACKAGE_ACCEPT = ".zip,application/zip,application/x-zip-compressed";
 const SEARCH_DEBOUNCE_MS = 175;
 
 type LoadPhase = "reading" | "validating" | "indexing";
+type WorkspaceView = "all" | "favorites" | "recent";
 
 interface LoadedPackage {
   session: IconPackageSession;
@@ -59,6 +79,11 @@ export function App() {
   );
   const [loadPhase, setLoadPhase] = useState<LoadPhase | null>(null);
   const [loadError, setLoadError] = useState<PackageProblem | null>(null);
+  const [persistedState, setPersistedState] = useState(
+    readInitialPersistedState,
+  );
+
+  useAppliedTheme(persistedState.preferences.theme);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -71,6 +96,17 @@ export function App() {
       disposeQuietly(active);
     };
   }, []);
+
+  const updatePreferences = useCallback(
+    (preferences: Partial<PersistedPreferences>) => {
+      setPersistedState((current) => {
+        const next = setPersistedPreferences(current, preferences);
+        persistStateQuietly(next);
+        return next;
+      });
+    },
+    [],
+  );
 
   const resetWorkspace = useCallback(() => {
     operationRef.current += 1;
@@ -133,6 +169,8 @@ export function App() {
           loadedPackage={loadedPackage}
           loadPhase={loadPhase}
           loadError={loadError}
+          preferences={persistedState.preferences}
+          onPreferencesChange={updatePreferences}
           onReplace={(file) => void loadPackage(file)}
         />
       ) : (
@@ -315,6 +353,8 @@ interface LoadedWorkspaceProps {
   loadedPackage: LoadedPackage;
   loadPhase: LoadPhase | null;
   loadError: PackageProblem | null;
+  preferences: PersistedPreferences;
+  onPreferencesChange: (preferences: Partial<PersistedPreferences>) => void;
   onReplace: (file: File) => void;
 }
 
@@ -322,21 +362,25 @@ function LoadedWorkspace({
   loadedPackage,
   loadPhase,
   loadError,
+  preferences,
+  onPreferencesChange,
   onReplace,
 }: LoadedWorkspaceProps) {
   const { session, filename } = loadedPackage;
   const { categories, summary } = session.metadata;
   const replacementInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const categoryButtonRef = useRef<HTMLButtonElement>(null);
+  const navigationButtonRef = useRef<HTMLButtonElement>(null);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>("all");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedIcon, setSelectedIcon] = useState<IconEntry | null>(null);
   const [detailsTrigger, setDetailsTrigger] = useState<HTMLElement | null>(
     null,
   );
-  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+  const [navigationSheetOpen, setNavigationSheetOpen] = useState(false);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(true);
   const [dropNotice, setDropNotice] = useState<string | null>(null);
 
   const results = useMemo(
@@ -403,8 +447,33 @@ function LoadedWorkspace({
     );
   };
 
+  const showAllIcons = () => {
+    setWorkspaceView("all");
+    setSelectedCategory(null);
+  };
+
+  const showFavorites = () => {
+    setWorkspaceView("favorites");
+    setSelectedCategory(null);
+  };
+
+  const showRecent = () => {
+    setWorkspaceView("recent");
+    setSelectedCategory(null);
+  };
+
   const selectCategory = (categoryId: string | null) => {
+    setWorkspaceView("all");
     setSelectedCategory(categoryId);
+  };
+
+  const toggleCategories = () => {
+    if (preferences.sidebarCollapsed) {
+      onPreferencesChange({ sidebarCollapsed: false });
+      setCategoriesExpanded(true);
+      return;
+    }
+    setCategoriesExpanded((current) => !current);
   };
 
   const clearSearch = () => {
@@ -412,63 +481,70 @@ function LoadedWorkspace({
     searchRef.current?.focus();
   };
 
+  const statusText =
+    workspaceView === "all"
+      ? `${results.length} ${results.length === 1 ? "icon" : "icons"}`
+      : workspaceView === "favorites"
+        ? "Favorites view"
+        : "Recent view";
+
   return (
     <div className="min-h-svh bg-background">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-card lg:flex">
-        <div className="border-b border-border p-4">
-          <div className="flex items-center gap-2.5">
-            <BrandMark compact />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">
-                Cloud Arch Icon Browser
-              </p>
-              <p className="text-xs text-muted-foreground">Local package</p>
-            </div>
-          </div>
-          <div className="mt-4 rounded-xl bg-muted/60 p-3">
-            <p className="truncate text-xs font-medium" title={filename}>
-              {filename}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {summary.iconCount} icons · {summary.categoryCount} categories
-            </p>
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <p className="mb-2 px-2.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            Categories
-          </p>
-          <CategoryTree
-            categories={categories}
-            totalIcons={summary.iconCount}
-            selectedCategory={selectedCategory}
-            onSelect={selectCategory}
-          />
-        </div>
-        <div className="border-t border-border p-4 text-[11px] leading-5 text-muted-foreground">
-          Local only · no package persistence
-        </div>
-      </aside>
+      <input
+        ref={replacementInputRef}
+        type="file"
+        accept={PACKAGE_ACCEPT}
+        aria-label="Choose replacement icon package ZIP"
+        className="sr-only"
+        onChange={handleReplacementInput}
+      />
 
-      <div className="min-w-0 lg:pl-64">
-        <header className="sticky top-0 z-20 border-b border-border bg-background">
-          <div className="flex min-w-0 items-center gap-2 px-3 py-3 sm:px-4">
+      <DesktopSidebar
+        categories={categories}
+        totalIcons={summary.iconCount}
+        filename={filename}
+        categoryCount={summary.categoryCount}
+        workspaceView={workspaceView}
+        selectedCategory={selectedCategory}
+        categoriesExpanded={categoriesExpanded}
+        collapsed={preferences.sidebarCollapsed}
+        theme={preferences.theme}
+        loadPhase={loadPhase}
+        onShowAll={showAllIcons}
+        onShowFavorites={showFavorites}
+        onShowRecent={showRecent}
+        onSelectCategory={selectCategory}
+        onToggleCategories={toggleCategories}
+        onToggleCollapsed={() =>
+          onPreferencesChange({
+            sidebarCollapsed: !preferences.sidebarCollapsed,
+          })
+        }
+        onThemeChange={(theme) => onPreferencesChange({ theme })}
+        onChangePackage={chooseReplacement}
+      />
+
+      <div
+        className={`min-w-0 transition-[padding] duration-200 ${preferences.sidebarCollapsed ? "lg:pl-[4.5rem]" : "lg:pl-72"}`}
+      >
+        <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
+          <div className="flex min-w-0 items-center gap-2 px-3 py-3 sm:px-4 lg:px-5">
             <Button
-              ref={categoryButtonRef}
+              ref={navigationButtonRef}
               type="button"
               variant="outline"
-              size="icon"
+              size="icon-lg"
               className="lg:hidden"
-              aria-label="Open categories"
-              onClick={() => setCategorySheetOpen(true)}
+              aria-label="Open navigation"
+              onClick={() => setNavigationSheetOpen(true)}
             >
-              <FolderTreeIcon aria-hidden="true" />
+              <MenuIcon aria-hidden="true" />
             </Button>
 
             <div className="relative min-w-0 flex-1">
               <SearchIcon
                 aria-hidden="true"
-                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
               />
               <input
                 ref={searchRef}
@@ -476,20 +552,20 @@ function LoadedWorkspace({
                 value={query}
                 aria-label="Search icons"
                 placeholder="Search icons by name, filename, or category"
-                className="h-9 w-full rounded-xl border border-input bg-card pl-9 pr-16 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+                className="h-11 w-full rounded-2xl border border-input bg-card pl-10 pr-16 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
                 onChange={(event) => setQuery(event.currentTarget.value)}
               />
               {query ? (
                 <button
                   type="button"
                   aria-label="Clear search"
-                  className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
+                  className="absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
                   onClick={clearSearch}
                 >
                   <XIcon aria-hidden="true" className="size-3.5" />
                 </button>
               ) : (
-                <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
+                <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
                   /
                 </kbd>
               )}
@@ -500,44 +576,7 @@ function LoadedWorkspace({
               aria-live="polite"
               className="hidden shrink-0 text-xs text-muted-foreground sm:inline"
             >
-              {results.length} {results.length === 1 ? "icon" : "icons"}
-            </span>
-
-            <input
-              ref={replacementInputRef}
-              type="file"
-              accept={PACKAGE_ACCEPT}
-              aria-label="Choose replacement icon package ZIP"
-              className="sr-only"
-              onChange={handleReplacementInput}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              disabled={loadPhase !== null}
-              aria-label="Change package"
-              onClick={chooseReplacement}
-            >
-              {loadPhase ? (
-                <LoaderCircleIcon
-                  aria-hidden="true"
-                  data-icon="inline-start"
-                  className="animate-spin"
-                />
-              ) : (
-                <RefreshCwIcon aria-hidden="true" data-icon="inline-start" />
-              )}
-              <span className="hidden sm:inline">
-                {loadPhase ? LOAD_PHASE_LABELS[loadPhase] : "Change package"}
-              </span>
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-3 border-t border-border/70 px-3 py-2 text-xs text-muted-foreground sm:hidden">
-            <span className="truncate" title={filename}>
-              {filename}
-            </span>
-            <span className="shrink-0">
-              {results.length}/{summary.iconCount} icons
+              {statusText}
             </span>
           </div>
         </header>
@@ -567,7 +606,11 @@ function LoadedWorkspace({
             </div>
           ) : null}
 
-          {results.length ? (
+          {workspaceView === "favorites" ? (
+            <WorkspacePlaceholder view="favorites" />
+          ) : workspaceView === "recent" ? (
+            <WorkspacePlaceholder view="recent" />
+          ) : results.length ? (
             <section aria-label="Icon results">
               <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
                 {results.map(({ icon }) => (
@@ -588,23 +631,30 @@ function LoadedWorkspace({
               query={query}
               selectedCategory={selectedCategory}
               onClearSearch={clearSearch}
-              onSearchAll={() => setSelectedCategory(null)}
+              onSearchAll={showAllIcons}
             />
           )}
         </main>
       </div>
 
-      <CategorySheet
-        open={categorySheetOpen}
-        trigger={categoryButtonRef.current}
+      <NavigationSheet
+        open={navigationSheetOpen}
+        trigger={navigationButtonRef.current}
         categories={categories}
         totalIcons={summary.iconCount}
+        filename={filename}
+        categoryCount={summary.categoryCount}
+        workspaceView={workspaceView}
         selectedCategory={selectedCategory}
-        onSelect={(categoryId) => {
-          selectCategory(categoryId);
-          setCategorySheetOpen(false);
-        }}
-        onRequestClose={() => setCategorySheetOpen(false)}
+        theme={preferences.theme}
+        loadPhase={loadPhase}
+        onShowAll={showAllIcons}
+        onShowFavorites={showFavorites}
+        onShowRecent={showRecent}
+        onSelectCategory={selectCategory}
+        onThemeChange={(theme) => onPreferencesChange({ theme })}
+        onChangePackage={chooseReplacement}
+        onRequestClose={() => setNavigationSheetOpen(false)}
       />
 
       <IconDetailsDialog
@@ -614,6 +664,544 @@ function LoadedWorkspace({
         onClose={() => setSelectedIcon(null)}
       />
     </div>
+  );
+}
+
+interface DesktopSidebarProps {
+  categories: readonly IconCategory[];
+  totalIcons: number;
+  filename: string;
+  categoryCount: number;
+  workspaceView: WorkspaceView;
+  selectedCategory: string | null;
+  categoriesExpanded: boolean;
+  collapsed: boolean;
+  theme: ThemePreference;
+  loadPhase: LoadPhase | null;
+  onShowAll: () => void;
+  onShowFavorites: () => void;
+  onShowRecent: () => void;
+  onSelectCategory: (categoryId: string | null) => void;
+  onToggleCategories: () => void;
+  onToggleCollapsed: () => void;
+  onThemeChange: (theme: ThemePreference) => void;
+  onChangePackage: () => void;
+}
+
+function DesktopSidebar({
+  categories,
+  totalIcons,
+  filename,
+  categoryCount,
+  workspaceView,
+  selectedCategory,
+  categoriesExpanded,
+  collapsed,
+  theme,
+  loadPhase,
+  onShowAll,
+  onShowFavorites,
+  onShowRecent,
+  onSelectCategory,
+  onToggleCategories,
+  onToggleCollapsed,
+  onThemeChange,
+  onChangePackage,
+}: DesktopSidebarProps) {
+  return (
+    <aside
+      className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-border bg-card transition-[width] duration-200 lg:flex ${collapsed ? "w-[4.5rem]" : "w-72"}`}
+    >
+      <div
+        className={`flex h-16 items-center border-b border-border ${collapsed ? "justify-between px-1" : "gap-2.5 px-3"}`}
+      >
+        <BrandMark compact />
+        {!collapsed ? (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">
+              Cloud Arch Icon Browser
+            </p>
+            <p className="text-xs text-muted-foreground">Local workspace</p>
+          </div>
+        ) : null}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={onToggleCollapsed}
+        >
+          {collapsed ? (
+            <PanelLeftOpenIcon aria-hidden="true" />
+          ) : (
+            <PanelLeftCloseIcon aria-hidden="true" />
+          )}
+        </Button>
+      </div>
+
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto ${collapsed ? "p-2" : "p-3"}`}
+      >
+        <WorkspaceNavigation
+          label="Workspace"
+          categories={categories}
+          totalIcons={totalIcons}
+          workspaceView={workspaceView}
+          selectedCategory={selectedCategory}
+          categoriesExpanded={categoriesExpanded}
+          collapsed={collapsed}
+          onShowAll={onShowAll}
+          onShowFavorites={onShowFavorites}
+          onShowRecent={onShowRecent}
+          onSelectCategory={onSelectCategory}
+          onToggleCategories={onToggleCategories}
+        />
+      </div>
+
+      <div className={`border-t border-border ${collapsed ? "p-2" : "p-3"}`}>
+        {!collapsed ? (
+          <div className="mb-3 rounded-xl bg-muted/60 p-3">
+            <p className="truncate text-xs font-medium" title={filename}>
+              {filename}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {totalIcons} icons · {categoryCount} categories
+            </p>
+          </div>
+        ) : null}
+
+        <Button
+          type="button"
+          variant="ghost"
+          size={collapsed ? "icon-lg" : "default"}
+          className={collapsed ? "mx-auto flex" : "w-full justify-start"}
+          disabled={loadPhase !== null}
+          aria-label="Change package"
+          title={collapsed ? "Change package" : undefined}
+          onClick={onChangePackage}
+        >
+          {loadPhase ? (
+            <LoaderCircleIcon aria-hidden="true" className="animate-spin" />
+          ) : (
+            <RefreshCwIcon aria-hidden="true" />
+          )}
+          {!collapsed ? (
+            <span>
+              {loadPhase ? LOAD_PHASE_LABELS[loadPhase] : "Change package"}
+            </span>
+          ) : null}
+        </Button>
+
+        <div
+          className={collapsed ? "mt-2" : "mt-3 border-t border-border pt-3"}
+        >
+          <ThemeControl
+            preference={theme}
+            compact={collapsed}
+            onChange={onThemeChange}
+          />
+        </div>
+
+        {!collapsed ? (
+          <p className="mt-3 px-1 text-[11px] leading-5 text-muted-foreground">
+            Local only · package content is never persisted
+          </p>
+        ) : null}
+      </div>
+    </aside>
+  );
+}
+
+interface WorkspaceNavigationProps {
+  label: string;
+  categories: readonly IconCategory[];
+  totalIcons: number;
+  workspaceView: WorkspaceView;
+  selectedCategory: string | null;
+  categoriesExpanded: boolean;
+  collapsed: boolean;
+  onShowAll: () => void;
+  onShowFavorites: () => void;
+  onShowRecent: () => void;
+  onSelectCategory: (categoryId: string | null) => void;
+  onToggleCategories: () => void;
+  onNavigate?: () => void;
+}
+
+function WorkspaceNavigation({
+  label,
+  categories,
+  totalIcons,
+  workspaceView,
+  selectedCategory,
+  categoriesExpanded,
+  collapsed,
+  onShowAll,
+  onShowFavorites,
+  onShowRecent,
+  onSelectCategory,
+  onToggleCategories,
+  onNavigate,
+}: WorkspaceNavigationProps) {
+  const navigate = (action: () => void) => {
+    action();
+    onNavigate?.();
+  };
+  const categoryActive = workspaceView === "all" && selectedCategory !== null;
+
+  return (
+    <nav aria-label={label}>
+      <div className="space-y-1">
+        <WorkspaceNavButton
+          label="All icons"
+          icon={<LayoutGridIcon aria-hidden="true" />}
+          active={workspaceView === "all" && selectedCategory === null}
+          collapsed={collapsed}
+          onClick={() => navigate(onShowAll)}
+        />
+        <WorkspaceNavButton
+          label="Favorites"
+          icon={<StarIcon aria-hidden="true" />}
+          active={workspaceView === "favorites"}
+          collapsed={collapsed}
+          onClick={() => navigate(onShowFavorites)}
+        />
+        <WorkspaceNavButton
+          label="Recent"
+          icon={<Clock3Icon aria-hidden="true" />}
+          active={workspaceView === "recent"}
+          collapsed={collapsed}
+          onClick={() => navigate(onShowRecent)}
+        />
+        <WorkspaceNavButton
+          label="Categories"
+          icon={<FolderTreeIcon aria-hidden="true" />}
+          active={categoryActive}
+          collapsed={collapsed}
+          expanded={!collapsed ? categoriesExpanded : undefined}
+          trailing={
+            !collapsed ? (
+              categoriesExpanded ? (
+                <ChevronDownIcon aria-hidden="true" className="size-3.5" />
+              ) : (
+                <ChevronRightIcon aria-hidden="true" className="size-3.5" />
+              )
+            ) : undefined
+          }
+          onClick={onToggleCategories}
+        />
+      </div>
+
+      {!collapsed && categoriesExpanded ? (
+        <div className="mt-2 border-l border-border pl-2">
+          <CategoryTree
+            categories={categories}
+            totalIcons={totalIcons}
+            selectedCategory={selectedCategory}
+            showAll={false}
+            onSelect={(categoryId) =>
+              navigate(() => onSelectCategory(categoryId))
+            }
+          />
+        </div>
+      ) : null}
+    </nav>
+  );
+}
+
+interface WorkspaceNavButtonProps {
+  label: string;
+  icon: ReactNode;
+  active: boolean;
+  collapsed: boolean;
+  expanded?: boolean | undefined;
+  trailing?: ReactNode | undefined;
+  onClick: () => void;
+}
+
+function WorkspaceNavButton({
+  label,
+  icon,
+  active,
+  collapsed,
+  expanded,
+  trailing,
+  onClick,
+}: WorkspaceNavButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
+      aria-expanded={expanded}
+      title={collapsed ? label : undefined}
+      className={`flex h-9 w-full items-center rounded-xl text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/30 ${collapsed ? "justify-center px-0" : "gap-2.5 px-2.5 text-left"} ${active ? "bg-accent font-medium text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+      onClick={onClick}
+    >
+      <span className="flex size-5 shrink-0 items-center justify-center [&>svg]:size-4">
+        {icon}
+      </span>
+      {!collapsed ? (
+        <>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {trailing ? (
+            <span className="shrink-0 text-muted-foreground">{trailing}</span>
+          ) : null}
+        </>
+      ) : null}
+    </button>
+  );
+}
+
+interface NavigationSheetProps {
+  open: boolean;
+  trigger: HTMLElement | null;
+  categories: readonly IconCategory[];
+  totalIcons: number;
+  filename: string;
+  categoryCount: number;
+  workspaceView: WorkspaceView;
+  selectedCategory: string | null;
+  theme: ThemePreference;
+  loadPhase: LoadPhase | null;
+  onShowAll: () => void;
+  onShowFavorites: () => void;
+  onShowRecent: () => void;
+  onSelectCategory: (categoryId: string | null) => void;
+  onThemeChange: (theme: ThemePreference) => void;
+  onChangePackage: () => void;
+  onRequestClose: () => void;
+}
+
+function NavigationSheet({
+  open,
+  trigger,
+  categories,
+  totalIcons,
+  filename,
+  categoryCount,
+  workspaceView,
+  selectedCategory,
+  theme,
+  loadPhase,
+  onShowAll,
+  onShowFavorites,
+  onShowRecent,
+  onSelectCategory,
+  onThemeChange,
+  onChangePackage,
+  onRequestClose,
+}: NavigationSheetProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(true);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) {
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+      queueMicrotask(() => closeRef.current?.focus());
+    } else if (!open && dialog.open) {
+      if (typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+    }
+  }, [open]);
+
+  const close = () => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (typeof dialog.close === "function") dialog.close();
+    else {
+      dialog.removeAttribute("open");
+      onRequestClose();
+      queueMicrotask(() => trigger?.focus());
+    }
+  };
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="navigation-sheet-title"
+      className="m-0 h-svh max-h-none w-[min(88vw,22rem)] max-w-none rounded-none rounded-r-2xl border-y-0 border-l-0 border-r border-border bg-card p-0 text-card-foreground backdrop:bg-dialog-backdrop lg:hidden"
+      onClose={() => {
+        onRequestClose();
+        queueMicrotask(() => trigger?.focus());
+      }}
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          close();
+        }
+      }}
+    >
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between border-b border-border p-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BrandMark compact />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Local workspace</p>
+              <h2
+                id="navigation-sheet-title"
+                className="truncate font-semibold"
+              >
+                Navigation
+              </h2>
+            </div>
+          </div>
+          <Button
+            ref={closeRef}
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Close navigation"
+            onClick={close}
+          >
+            <XIcon aria-hidden="true" />
+          </Button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <WorkspaceNavigation
+            label="Mobile workspace"
+            categories={categories}
+            totalIcons={totalIcons}
+            workspaceView={workspaceView}
+            selectedCategory={selectedCategory}
+            categoriesExpanded={categoriesExpanded}
+            collapsed={false}
+            onShowAll={onShowAll}
+            onShowFavorites={onShowFavorites}
+            onShowRecent={onShowRecent}
+            onSelectCategory={onSelectCategory}
+            onToggleCategories={() =>
+              setCategoriesExpanded((current) => !current)
+            }
+            onNavigate={close}
+          />
+        </div>
+
+        <div className="border-t border-border p-3">
+          <div className="rounded-xl bg-muted/60 p-3">
+            <p className="truncate text-xs font-medium" title={filename}>
+              {filename}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {totalIcons} icons · {categoryCount} categories
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="mt-2 w-full justify-start"
+            disabled={loadPhase !== null}
+            aria-label="Change package"
+            onClick={() => {
+              close();
+              onChangePackage();
+            }}
+          >
+            {loadPhase ? (
+              <LoaderCircleIcon aria-hidden="true" className="animate-spin" />
+            ) : (
+              <RefreshCwIcon aria-hidden="true" />
+            )}
+            <span>
+              {loadPhase ? LOAD_PHASE_LABELS[loadPhase] : "Change package"}
+            </span>
+          </Button>
+          <div className="mt-3 border-t border-border pt-3">
+            <ThemeControl preference={theme} onChange={onThemeChange} />
+          </div>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+interface ThemeControlProps {
+  preference: ThemePreference;
+  compact?: boolean;
+  onChange: (theme: ThemePreference) => void;
+}
+
+const THEME_OPTIONS: readonly {
+  value: ThemePreference;
+  label: string;
+  icon: typeof MonitorIcon;
+}[] = [
+  { value: "system", label: "System", icon: MonitorIcon },
+  { value: "light", label: "Light", icon: SunIcon },
+  { value: "dark", label: "Dark", icon: MoonIcon },
+];
+
+function ThemeControl({
+  preference,
+  compact = false,
+  onChange,
+}: ThemeControlProps) {
+  return (
+    <div>
+      {!compact ? (
+        <p className="mb-2 px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+          Theme
+        </p>
+      ) : null}
+      <fieldset className={compact ? "space-y-1" : "grid grid-cols-3 gap-1"}>
+        <legend className="sr-only">Theme</legend>
+        {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+          const selected = preference === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-label={`${label} theme`}
+              aria-pressed={selected}
+              title={compact ? `${label} theme` : undefined}
+              className={`flex h-8 items-center justify-center rounded-xl outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/30 ${compact ? "w-full" : "gap-1.5 px-2 text-xs"} ${selected ? "bg-accent font-medium text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              onClick={() => onChange(value)}
+            >
+              <Icon aria-hidden="true" className="size-3.5" />
+              {!compact ? <span>{label}</span> : null}
+            </button>
+          );
+        })}
+      </fieldset>
+    </div>
+  );
+}
+
+function WorkspacePlaceholder({
+  view,
+}: {
+  view: Exclude<WorkspaceView, "all">;
+}) {
+  const favorites = view === "favorites";
+  const Icon = favorites ? StarIcon : Clock3Icon;
+
+  return (
+    <section
+      aria-labelledby={`${view}-heading`}
+      className="mx-auto mt-12 max-w-md rounded-2xl border border-border bg-card p-6 text-center"
+    >
+      <div className="mx-auto flex size-11 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+        <Icon aria-hidden="true" className="size-4" />
+      </div>
+      <h2 id={`${view}-heading`} className="mt-3 text-sm font-semibold">
+        {favorites ? "Favorites" : "Recent"}
+      </h2>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+        {favorites
+          ? "Favorite icon actions and saved results will appear here in the next v0.2.0 step."
+          : "Recently opened icons will appear here once the v0.2.0 history experience is connected."}
+      </p>
+    </section>
   );
 }
 
@@ -653,104 +1241,6 @@ function IconCard({ session, icon, onOpen }: IconCardProps) {
         <span className="block truncate text-muted-foreground">{category}</span>
       </span>
     </button>
-  );
-}
-
-interface CategorySheetProps {
-  open: boolean;
-  trigger: HTMLElement | null;
-  categories: readonly IconCategory[];
-  totalIcons: number;
-  selectedCategory: string | null;
-  onSelect: (categoryId: string | null) => void;
-  onRequestClose: () => void;
-}
-
-function CategorySheet({
-  open,
-  trigger,
-  categories,
-  totalIcons,
-  selectedCategory,
-  onSelect,
-  onRequestClose,
-}: CategorySheetProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) {
-      if (typeof dialog.showModal === "function") dialog.showModal();
-      else dialog.setAttribute("open", "");
-      queueMicrotask(() => closeRef.current?.focus());
-    } else if (!open && dialog.open) {
-      if (typeof dialog.close === "function") dialog.close();
-      else dialog.removeAttribute("open");
-    }
-  }, [open]);
-
-  const close = () => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (typeof dialog.close === "function") dialog.close();
-    else {
-      dialog.removeAttribute("open");
-      onRequestClose();
-      queueMicrotask(() => trigger?.focus());
-    }
-  };
-
-  return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="category-sheet-title"
-      className="m-0 h-svh max-h-none w-[min(86vw,20rem)] max-w-none rounded-none rounded-r-2xl border-y-0 border-l-0 border-r border-border bg-card p-0 text-card-foreground backdrop:bg-dialog-backdrop lg:hidden"
-      onClose={() => {
-        onRequestClose();
-        queueMicrotask(() => trigger?.focus());
-      }}
-      onCancel={(event) => {
-        event.preventDefault();
-        close();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          close();
-        }
-      }}
-    >
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <div>
-            <p className="text-xs text-muted-foreground">Browse package</p>
-            <h2 id="category-sheet-title" className="font-semibold">
-              Categories
-            </h2>
-          </div>
-          <Button
-            ref={closeRef}
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Close categories"
-            onClick={close}
-          >
-            <XIcon aria-hidden="true" />
-          </Button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <CategoryTree
-            categories={categories}
-            totalIcons={totalIcons}
-            selectedCategory={selectedCategory}
-            onSelect={onSelect}
-          />
-        </div>
-      </div>
-    </dialog>
   );
 }
 
@@ -846,6 +1336,48 @@ function useDebouncedValue(value: string, delayMs: number): string {
   }, [delayMs, value]);
 
   return debounced;
+}
+
+function useAppliedTheme(preference: ThemePreference): void {
+  useLayoutEffect(() => {
+    const media =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : null;
+
+    const apply = () => {
+      const resolved =
+        preference === "system"
+          ? media?.matches
+            ? "dark"
+            : "light"
+          : preference;
+      document.documentElement.dataset.theme = resolved;
+      document.documentElement.style.colorScheme = resolved;
+    };
+
+    apply();
+    if (preference === "system") media?.addEventListener("change", apply);
+    return () => media?.removeEventListener("change", apply);
+  }, [preference]);
+}
+
+function readInitialPersistedState() {
+  try {
+    return loadPersistedState(window.localStorage);
+  } catch {
+    return createDefaultPersistedState();
+  }
+}
+
+function persistStateQuietly(
+  state: ReturnType<typeof createDefaultPersistedState>,
+): void {
+  try {
+    savePersistedState(window.localStorage, state);
+  } catch {
+    // Persistence is optional and must never block the active workspace.
+  }
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
