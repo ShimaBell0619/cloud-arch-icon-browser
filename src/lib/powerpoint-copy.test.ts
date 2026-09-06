@@ -12,7 +12,9 @@ describe("PowerPoint Copy all client guards", () => {
     expect(isCanonicalPowerPointBridgeOrigin("http://localhost:41731")).toBe(
       false,
     );
-    expect(isCanonicalPowerPointBridgeOrigin("https://example.com")).toBe(false);
+    expect(isCanonicalPowerPointBridgeOrigin("https://example.com")).toBe(
+      false,
+    );
   });
 
   it("keeps the experimental object limit bounded", () => {

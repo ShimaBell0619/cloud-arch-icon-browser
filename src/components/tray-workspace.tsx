@@ -17,8 +17,8 @@ import { isExperimentalPowerPointCopyAllEnabled } from "@/lib/feature-flags";
 import {
   copyTrayToPowerPoint,
   getPowerPointCopyCapability,
-  type PowerPointCopyCapability,
   POWERPOINT_EXPERIMENT_ACK_KEY,
+  type PowerPointCopyCapability,
   powerPointCopyErrorMessage,
 } from "@/lib/powerpoint-copy";
 
@@ -164,7 +164,10 @@ export function TrayWorkspace({
                     className="animate-spin"
                   />
                 ) : (
-                  <ClipboardCopyIcon aria-hidden="true" data-icon="inline-start" />
+                  <ClipboardCopyIcon
+                    aria-hidden="true"
+                    data-icon="inline-start"
+                  />
                 )}
                 Copy all
                 <span className="rounded-md border border-primary-foreground/35 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">

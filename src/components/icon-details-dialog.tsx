@@ -104,7 +104,10 @@ export function IconDetailsDialog({
     try {
       await copySvgText(session, icon);
       onUsed?.(icon);
-      setNotice({ kind: "success", message: "Copied original SVG source text." });
+      setNotice({
+        kind: "success",
+        message: "Copied original SVG source text.",
+      });
     } catch (error) {
       setNotice({ kind: "error", message: clipboardErrorMessage(error) });
     } finally {

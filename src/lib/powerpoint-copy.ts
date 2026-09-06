@@ -1,9 +1,9 @@
 import type { IconPackageSession, TrayItem } from "@/core";
+import { isExperimentalPowerPointCopyAllEnabled } from "@/lib/feature-flags";
 import {
   COPY_IMAGE_SIZE,
   renderSvgBlobToNormalizedPng,
 } from "@/lib/icon-clipboard";
-import { isExperimentalPowerPointCopyAllEnabled } from "@/lib/feature-flags";
 
 const CANONICAL_POWERPOINT_ORIGIN = "http://127.0.0.1:41731";
 const CAPABILITY_PATH = "/__bridge/powerpoint/capability";
@@ -58,7 +58,8 @@ export async function getPowerPointCopyCapability(): Promise<PowerPointCopyCapab
     if (!isRecord(value)) return unavailable("bridge-unavailable");
     const available = value.available === true;
     const maxObjects =
-      typeof value.maxObjects === "number" && Number.isSafeInteger(value.maxObjects)
+      typeof value.maxObjects === "number" &&
+      Number.isSafeInteger(value.maxObjects)
         ? value.maxObjects
         : MAX_POWERPOINT_COPY_OBJECTS;
     return {
@@ -132,7 +133,9 @@ async function renderTrayItems(
   session: IconPackageSession,
   items: readonly TrayItem[],
 ): Promise<readonly { pngBase64: string; quantity: number }[]> {
-  const results = new Array<{ pngBase64: string; quantity: number }>(items.length);
+  const results = new Array<{ pngBase64: string; quantity: number }>(
+    items.length,
+  );
   let cursor = 0;
   const worker = async () => {
     while (cursor < items.length) {
@@ -162,13 +165,17 @@ function blobToBase64(blob: Blob): Promise<string> {
       const result = String(reader.result ?? "");
       const comma = result.indexOf(",");
       if (comma < 0) {
-        reject(new PowerPointCopyError("Could not encode a Tray icon for Copy all."));
+        reject(
+          new PowerPointCopyError("Could not encode a Tray icon for Copy all."),
+        );
         return;
       }
       resolve(result.slice(comma + 1));
     };
     reader.onerror = () =>
-      reject(new PowerPointCopyError("Could not encode a Tray icon for Copy all."));
+      reject(
+        new PowerPointCopyError("Could not encode a Tray icon for Copy all."),
+      );
     reader.readAsDataURL(blob);
   });
 }

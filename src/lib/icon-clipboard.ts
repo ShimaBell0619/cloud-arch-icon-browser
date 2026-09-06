@@ -265,7 +265,11 @@ async function renderImageToPng(
   image: HTMLImageElement,
   size: number,
 ): Promise<Blob> {
-  const rect = fitImageIntoSquare(image.naturalWidth, image.naturalHeight, size);
+  const rect = fitImageIntoSquare(
+    image.naturalWidth,
+    image.naturalHeight,
+    size,
+  );
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;

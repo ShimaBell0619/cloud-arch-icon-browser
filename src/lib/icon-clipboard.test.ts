@@ -58,8 +58,8 @@ describe("clipboard PNG geometry", () => {
     expect(() => fitImageIntoSquare(64, Number.NaN)).toThrow(
       ClipboardImageError,
     );
-    expect(() => findVisibleAlphaBounds(new Uint8ClampedArray(3), 2, 2)).toThrow(
-      ClipboardImageError,
-    );
+    expect(() =>
+      findVisibleAlphaBounds(new Uint8ClampedArray(3), 2, 2),
+    ).toThrow(ClipboardImageError);
   });
 });
