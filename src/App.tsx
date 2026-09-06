@@ -85,6 +85,12 @@ import {
 } from "@/core";
 import { clipboardErrorMessage, copyIconAsPng } from "@/lib/icon-clipboard";
 import { choosePackageFile } from "@/lib/package-file-picker";
+import {
+  commitSelectedPackageHandle,
+  forgetRememberedPackageHandle,
+  hasRememberedPackageHandle,
+  openRememberedPackageFile,
+} from "@/lib/package-handle-store";
 import { version } from "../package.json";
 
 const PACKAGE_ACCEPT = ".zip,application/zip,application/x-zip-compressed";
@@ -206,6 +212,7 @@ export function App() {
 
     const previous = activeSessionRef.current;
     activeSessionRef.current = candidate.session;
+    void commitSelectedPackageHandle(file);
     setTrayItems((current) => {
       const reconciled = reconcileTrayWithIcons(
         current,
@@ -269,10 +276,45 @@ interface PackagePickerProps {
 function PackagePicker({ loadPhase, loadError, onLoad }: PackagePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [rememberedPackageAvailable, setRememberedPackageAvailable] =
+    useState(false);
+  const [rememberedNotice, setRememberedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void hasRememberedPackageHandle().then((available) => {
+      if (!cancelled) setRememberedPackageAvailable(available);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const chooseFile = () => {
+    setRememberedNotice(null);
     void choosePackageFile({ fallbackInput: inputRef.current }).then((file) => {
       if (file) onLoad(file);
+    });
+  };
+
+  const openPrevious = () => {
+    setRememberedNotice(null);
+    void openRememberedPackageFile({ requestPermission: true }).then((file) => {
+      if (file) {
+        onLoad(file);
+        return;
+      }
+      setRememberedPackageAvailable(false);
+      setRememberedNotice(
+        "The previous ZIP is no longer available. Choose the package again from this device.",
+      );
+    });
+  };
+
+  const forgetPrevious = () => {
+    void forgetRememberedPackageHandle().finally(() => {
+      setRememberedPackageAvailable(false);
+      setRememberedNotice("Previous package reference forgotten.");
     });
   };
 
@@ -336,7 +378,7 @@ function PackagePicker({ loadPhase, loadError, onLoad }: PackagePickerProps) {
               </h2>
               <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
                 The ZIP stays on this device. No package content is uploaded or
-                persisted by the application.
+                copied into application storage.
               </p>
               <LoadPhases active={loadPhase} />
             </div>
@@ -347,8 +389,7 @@ function PackagePicker({ loadPhase, loadError, onLoad }: PackagePickerProps) {
               </h2>
               <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
                 Drop the official Microsoft Azure Architecture Icons ZIP here,
-                or choose it from this device. The package is processed locally
-                for this session only.
+                or choose it from this device. The package is processed locally.
               </p>
               <input
                 ref={inputRef}
@@ -359,7 +400,21 @@ function PackagePicker({ loadPhase, loadError, onLoad }: PackagePickerProps) {
                 onChange={handleInput}
               />
               <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                <Button type="button" size="lg" onClick={chooseFile}>
+                {rememberedPackageAvailable ? (
+                  <Button type="button" size="lg" onClick={openPrevious}>
+                    <RefreshCwIcon
+                      aria-hidden="true"
+                      data-icon="inline-start"
+                    />
+                    Open previous ZIP
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  size="lg"
+                  variant={rememberedPackageAvailable ? "outline" : "default"}
+                  onClick={chooseFile}
+                >
                   <UploadIcon aria-hidden="true" data-icon="inline-start" />
                   Choose ZIP
                 </Button>
@@ -381,8 +436,24 @@ function PackagePicker({ loadPhase, loadError, onLoad }: PackagePickerProps) {
                   <span className="sr-only"> (opens in a new tab)</span>
                 </Button>
               </div>
+              {rememberedPackageAvailable ? (
+                <button
+                  type="button"
+                  className="mt-3 text-xs text-muted-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
+                  onClick={forgetPrevious}
+                >
+                  Forget previous ZIP reference
+                </button>
+              ) : null}
+              {rememberedNotice ? (
+                <p role="status" className="mt-3 text-xs text-muted-foreground">
+                  {rememberedNotice}
+                </p>
+              ) : null}
               <p className="mt-4 text-xs text-muted-foreground">
-                Drag and drop works only before a package is loaded.
+                Drag and drop works only before a package is loaded. When
+                supported, only the local file handle is remembered; ZIP bytes
+                remain in the original file.
               </p>
             </>
           )}
