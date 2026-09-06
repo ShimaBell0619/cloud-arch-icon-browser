@@ -27,6 +27,14 @@ interface SearchDocument {
   categoryPath: string;
 }
 
+const SEARCH_MATCH_PRIORITY: Record<SearchMatch, number> = {
+  all: 0,
+  exact: 0,
+  prefix: 1,
+  substring: 2,
+  fuzzy: 3,
+};
+
 export class IconSearchIndex {
   readonly #documents: readonly SearchDocument[];
   readonly #fuse: Fuse<SearchDocument>;
@@ -53,19 +61,21 @@ export class IconSearchIndex {
   search(query: string, categoryId: string | null = null): IconSearchResult[] {
     const normalized = normalizeSearch(query);
     const results = new Map<string, IconSearchResult>();
-    for (const { icon, displayName } of this.#documents) {
-      if (!isInCategory(icon, categoryId)) continue;
-      const match = !normalized
-        ? "all"
-        : displayName === normalized
-          ? "exact"
-          : displayName.startsWith(normalized)
-            ? "prefix"
-            : displayName.includes(normalized)
-              ? "substring"
-              : null;
-      if (match) results.set(icon.id, { icon, match, score: 0 });
+
+    for (const document of this.#documents) {
+      if (!isInCategory(document.icon, categoryId)) continue;
+      const match = normalized
+        ? deterministicMatch(document, normalized)
+        : "all";
+      if (match) {
+        results.set(document.icon.id, {
+          icon: document.icon,
+          match,
+          score: 0,
+        });
+      }
     }
+
     if (normalized) {
       for (const { item, score } of this.#fuse.search(normalized)) {
         // Fuse's threshold applies to individual fields. Also omit weak combined
@@ -86,19 +96,28 @@ export class IconSearchIndex {
         }
       }
     }
-    const priority: Record<SearchMatch, number> = {
-      all: 0,
-      exact: 0,
-      prefix: 1,
-      substring: 2,
-      fuzzy: 3,
-    };
+
     return [...results.values()].sort(
       (a, b) =>
-        priority[a.match] - priority[b.match] ||
+        SEARCH_MATCH_PRIORITY[a.match] - SEARCH_MATCH_PRIORITY[b.match] ||
         a.score - b.score ||
         compareNames(a.icon.displayName, b.icon.displayName) ||
         compareNames(a.icon.id, b.icon.id),
     );
   }
+}
+
+function deterministicMatch(
+  document: SearchDocument,
+  query: string,
+): Exclude<SearchMatch, "all" | "fuzzy"> | null {
+  const fields = [
+    document.displayName,
+    document.filename,
+    document.categoryPath,
+  ];
+  if (fields.some((field) => field === query)) return "exact";
+  if (fields.some((field) => field.startsWith(query))) return "prefix";
+  if (fields.some((field) => field.includes(query))) return "substring";
+  return null;
 }
