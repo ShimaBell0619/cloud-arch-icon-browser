@@ -34,7 +34,7 @@ export function LazyIconPreview({
 
   useEffect(() => {
     let cancelled = false;
-    let stopObserving = () => undefined;
+    let stopObserving: () => void = () => undefined;
 
     const load = async (priority = 0) => {
       if (!cancelled) setPreview({ status: "loading", url: null });
