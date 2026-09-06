@@ -309,7 +309,9 @@ test("narrow mobile navigation and dialog stay usable without horizontal overflo
   await page.setViewportSize({ width: 390, height: 844 });
   await loadPackage(page);
 
-  await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open navigation" }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
