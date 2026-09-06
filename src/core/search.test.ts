@@ -108,9 +108,7 @@ describe("icon search", () => {
     const large = new IconSearchIndex(
       parsePackageMetadata(
         Array.from({ length: 160 }, (_, i) =>
-          entryMetadata(
-            `Group${i}/${i}-icon-service-Same-Resource-${i}.svg`,
-          ),
+          entryMetadata(`Group${i}/${i}-icon-service-Same-Resource-${i}.svg`),
         ),
         4096,
       ).icons,
