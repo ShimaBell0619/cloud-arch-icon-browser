@@ -64,9 +64,7 @@ export function removeTrayItem(
   items: readonly TrayItem[],
   canonicalPath: string,
 ): readonly TrayItem[] {
-  return items.filter(
-    (item) => item.reference.canonicalPath !== canonicalPath,
-  );
+  return items.filter((item) => item.reference.canonicalPath !== canonicalPath);
 }
 
 export function moveTrayItem(
@@ -82,7 +80,10 @@ export function moveTrayItem(
   if (target < 0 || target >= items.length) return items;
 
   const next = [...items];
-  [next[index], next[target]] = [next[target] as TrayItem, next[index] as TrayItem];
+  [next[index], next[target]] = [
+    next[target] as TrayItem,
+    next[index] as TrayItem,
+  ];
   return next;
 }
 
