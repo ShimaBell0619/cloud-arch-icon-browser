@@ -138,7 +138,7 @@ npm test
 npm run build
 ```
 
-These are real one-shot gates and must not be replaced with no-op scripts. The reusable Web App Foundation workflow provides the generic CI baseline by exact SHA.
+These are real one-shot gates and must not be replaced with no-op scripts. Web App Foundation v0.2.0 is the approved generic CI baseline; Issue #73 adds the app-owned caller and exact full-SHA reference before this adoption is treated as complete.
 
 Application-specific validation remains app-owned. Run when relevant:
 

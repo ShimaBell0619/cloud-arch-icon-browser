@@ -4,7 +4,7 @@ Cloud Arch Icon Browser is the first real consumer of `ShimaBell0619/web-app-fou
 
 - Adopted Foundation version: 0.2.0
 - Copied-rule/template commit: `83c06f73aa21bdd9f1d4fac2fdb2b25d69e5c365`
-- Reusable workflow commit: `83c06f73aa21bdd9f1d4fac2fdb2b25d69e5c365`
+- Reusable workflow commit: `83c06f73aa21bdd9f1d4fac2fdb2b25d69e5c365` (selected for #73; caller adoption pending)
 - Adopted on: 2026-09-07
 - App-specific deviations:
   - The application keeps its existing product-specific security, compatibility, release, CLI/package, and UI-review contracts in dedicated specialist documents rather than copying those details into Foundation core documents.
@@ -12,3 +12,5 @@ Cloud Arch Icon Browser is the first real consumer of `ShimaBell0619/web-app-fou
   - Node runtime support for the published application remains defined by this application's `package.json`; the Foundation repository's own tooling engine range does not override the consumer runtime contract.
 
 Copied Foundation rules/templates do not update automatically. Reusable workflows execute the exact commit SHA referenced by this application. Foundation upgrades must review the Foundation changelog/diff, preserve approved app-specific deviations, update copied contracts deliberately, update the reusable-workflow SHA only after review, and refresh this provenance record.
+
+Issue #73 removes the pending marker only after the app-owned caller actually references the selected full SHA.
