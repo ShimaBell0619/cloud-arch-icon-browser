@@ -13,10 +13,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  foundation:
-    name: Foundation checks
+  web-verify:
+    name: Shared Web verification
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-ci.yml@83c06f73aa21bdd9f1d4fac2fdb2b25d69e5c365
+    with:
+      node_version_file: .node-version
+      cache_dependency_path: package-lock.json
+      run_check: true
+      run_typecheck: true
+      run_test: true
+      run_e2e: false
+    permissions:
+      contents: read
+
+  app-change-scope:
+    name: App-specific change scope
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     outputs:
       code_changed: ${{ steps.changes.outputs.code_changed }}
     steps:
@@ -36,63 +49,75 @@ jobs:
         run: |
           set -euo pipefail
 
+          mark_code_changed() {
+            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+          }
+
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             base="$PR_BASE_SHA"
           elif [[ "$EVENT_NAME" == "push" ]]; then
             base="$BEFORE_SHA"
           else
-            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+            mark_code_changed
             exit 0
           fi
 
           if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
-            echo "code_changed=true" >> "$GITHUB_OUTPUT"
+            mark_code_changed
+            exit 0
+          fi
+
+          if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            mark_code_changed
+            exit 0
+          fi
+
+          if ! changed="$(git diff --name-status --no-renames "$base" "$HEAD_SHA")"; then
+            mark_code_changed
             exit 0
           fi
 
           code_changed=false
-          while IFS= read -r path; do
-            if [[ "$path" == *.md || "$path" == docs/* ]]; then
+          while IFS=$'\t' read -r status path; do
+            if [[ -z "$path" ]]; then
               continue
             fi
+
+            if [[ "$path" == docs/* || ( "$path" != */* && "$path" == *.md ) ]]; then
+              continue
+            fi
+
             code_changed=true
             break
-          done < <(git diff --name-only "$base" "$HEAD_SHA")
+          done <<< "$changed"
 
           echo "code_changed=$code_changed" >> "$GITHUB_OUTPUT"
 
-      - name: Docs-only change
-        if: steps.changes.outputs.code_changed == 'false'
-        run: echo "Documentation-only change detected; full CI checks are not required."
-
+  app-smoke:
+    name: Application CLI/package validation
+    needs: app-change-scope
+    if: needs.app-change-scope.outputs.code_changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        if: steps.changes.outputs.code_changed == 'true'
         with:
           node-version-file: .node-version
           cache: npm
-      - if: steps.changes.outputs.code_changed == 'true'
-        run: npm ci
-      - if: steps.changes.outputs.code_changed == 'true'
-        run: npm run check
-      - if: steps.changes.outputs.code_changed == 'true'
-        run: npm run typecheck
-      - if: steps.changes.outputs.code_changed == 'true'
-        run: npm test
-      - if: steps.changes.outputs.code_changed == 'true'
-        run: npm run build
-      - if: steps.changes.outputs.code_changed == 'true'
-        run: npm run test:cli-smoke
-      - if: steps.changes.outputs.code_changed == 'true'
-        run: node scripts/cli-server-smoke.mjs
-      - if: steps.changes.outputs.code_changed == 'true'
-        run: npm run test:cli-package-smoke
-      - if: steps.changes.outputs.code_changed == 'true'
-        run: npm run verify:package
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:cli-smoke
+      - run: node scripts/cli-server-smoke.mjs
+      - run: npm run test:cli-package-smoke
+      - run: npm run verify:package
 
   release-readiness:
     name: Release readiness gate
-    needs: foundation
-    if: needs.foundation.outputs.code_changed == 'true'
+    needs: app-change-scope
+    if: needs.app-change-scope.outputs.code_changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -108,8 +133,8 @@ jobs:
 
   browser-e2e:
     name: Browser E2E / a11y / visual
-    needs: foundation
-    if: needs.foundation.outputs.code_changed == 'true'
+    needs: app-change-scope
+    if: needs.app-change-scope.outputs.code_changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -144,8 +169,8 @@ jobs:
 
   cli-package-smoke:
     name: Packaged CLI smoke (${{ matrix.os }})
-    needs: foundation
-    if: needs.foundation.outputs.code_changed == 'true'
+    needs: app-change-scope
+    if: needs.app-change-scope.outputs.code_changed == 'true'
     strategy:
       fail-fast: false
       matrix:
