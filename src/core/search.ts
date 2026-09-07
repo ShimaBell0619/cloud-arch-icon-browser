@@ -10,7 +10,7 @@ export function normalizeSearch(value: string): string {
     .replace(/[\s-]+/gu, "");
 }
 
-// DESIGN.md's starting target; official-package relevance tuning is still pending.
+// Initial conservative fuzzy threshold; tune only with measured package behavior.
 export const INITIAL_FUZZY_THRESHOLD = 0.35;
 
 export type SearchMatch = "all" | "exact" | "prefix" | "substring" | "fuzzy";
