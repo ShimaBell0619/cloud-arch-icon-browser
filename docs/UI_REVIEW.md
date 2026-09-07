@@ -1,6 +1,6 @@
 # UI review and Pages preview
 
-This document defines maintainer-facing browser UI review and GitHub Pages preview workflows. Both are development infrastructure; neither changes the local-only product/runtime contract in `DESIGN.md`.
+This document defines maintainer-facing browser UI review and GitHub Pages preview workflows. Both are development infrastructure; neither changes the local-only product/runtime contract in `PRODUCT.md` or the UI/UX contract in `DESIGN.md`.
 
 ## Automated browser review
 
@@ -57,12 +57,10 @@ All preview paths preserve the same product boundaries:
 
 - deploy only repository-owned built application assets,
 - never publish or persist Microsoft ZIP/SVG assets,
-- process a user-selected ZIP only in the current browser session,
-- do not upload selected ZIP/SVG content to GitHub or another backend,
+- process a user-selected ZIP locally in the browser/application runtime and never upload selected ZIP/SVG content to GitHub or another backend,
 - do not add telemetry, analytics, account state, cloud sync, or runtime package/update APIs,
-- do not persist file handles or silently reopen a package.
-
-The application may use the browser File System Access picker transiently when available, but the resulting handle is not persisted. Unsupported browsers and picker failures fall back to the normal ZIP file input.
+- do not persist ZIP bytes, SVG bodies, generated images, or package-session resources,
+- a successfully validated `FileSystemFileHandle` may be remembered in IndexedDB only under the product boundary in `PRODUCT.md`; permission prompts remain explicit user-gesture operations and Pages/browser limitations may fall back to the normal ZIP input.
 
 ## Maintenance
 

@@ -94,11 +94,16 @@ The recorder starts the local app, performs the search → details → Copy imag
 
 ## Project docs
 
-- [`DESIGN.md`](./DESIGN.md) — product and architecture design contract.
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — contribution workflow and development details.
+- [`PRODUCT.md`](./PRODUCT.md) — current product behavior, support boundaries, and non-goals.
+- [`DESIGN.md`](./DESIGN.md) — UI/UX and design-system contract.
+- [`AGENTS.md`](./AGENTS.md) — engineering and coding-agent workflow rules.
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — implementation architecture and resource ownership.
+- [`docs/FOUNDATION.md`](./docs/FOUNDATION.md) — adopted Web App Foundation provenance.
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — human contribution workflow and development details.
 - [`COMPATIBILITY.md`](./COMPATIBILITY.md) — official package compatibility status.
+- [`docs/UI_REVIEW.md`](./docs/UI_REVIEW.md) — rendered UI and Pages-preview review process.
 - [`docs/RELEASE.md`](./docs/RELEASE.md) — release and maintenance runbook.
-- [`SECURITY.md`](./SECURITY.md) — vulnerability reporting policy.
+- [`SECURITY.md`](./SECURITY.md) — vulnerability reporting and security boundaries.
 
 ## License
 

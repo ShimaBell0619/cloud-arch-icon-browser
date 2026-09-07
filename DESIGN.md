@@ -1,353 +1,173 @@
-# Cloud Arch Icon Browser — Design Contract
+---
+version: alpha
+name: Cloud Arch Icon Browser
+description: UI, UX, and design-system contract for the local architecture icon browser.
+---
 
-Status: current design baseline.
+# Design System
 
-This document contains the product and engineering contracts that future changes must preserve. Public usage belongs in `README.md`; contribution, UI-review, compatibility, and release procedures belong in their dedicated documents.
+## Overview
 
-If implementation pressure conflicts with this contract, raise the conflict in an Issue or PR and obtain an explicit design decision instead of silently changing the design.
+Cloud Arch Icon Browser is a search-first utility for quickly finding and using architecture icons. The interface should feel calm, dense, modern, and product-focused: neutral surfaces, restrained chrome, and a blue accent without imitating Microsoft/Azure branding.
 
-## 1. Product contract
+`DESIGN.md` is authoritative for **UI/UX and design-system decisions**. Product behavior and non-goals belong in `PRODUCT.md`; engineering workflow belongs in `AGENTS.md`; substantial technical architecture belongs in `docs/ARCHITECTURE.md`.
 
-Cloud Arch Icon Browser is an independent local tool for browsing a user-downloaded Microsoft Azure Architecture Icons ZIP and quickly finding, previewing, copying, and downloading icons.
+Design for fast retrieval and low-friction copy workflows. Prefer clear hierarchy, keyboard accessibility, responsive behavior, and stable information density over decorative novelty.
 
-Core boundaries:
+## Colors
 
-- Microsoft Azure Architecture Icons are not bundled with the repository or npm package.
-- The user downloads the official ZIP from Microsoft and selects it explicitly.
-- ZIP/SVG processing stays local; selected package bytes, extracted SVGs, generated images, and package-session resources are not uploaded or persisted. On supported browsers, a `FileSystemFileHandle` reference may be persisted separately in IndexedDB after successful package validation so the user can reopen the same local file later.
-- Original SVG bytes and filenames are immutable for download. Do not rewrite, optimize, recolor, resize, sanitize-for-download, or rename them.
-- The running application makes no automatic external network requests for package content, telemetry, analytics, crash reporting, or update checks. User-clicked documentation links are allowed.
-- GitHub Pages is development-only preview infrastructure, not a supported product distribution channel.
-- The project must not imply Microsoft affiliation, endorsement, sponsorship, or official status.
+- Use semantic design tokens rather than scattering literal colors through components.
+- Use a restrained blue accent for primary/selected emphasis without copying Microsoft/Azure brand language.
+- Support `System`, `Light`, and `Dark` appearance. The saved `System` preference follows live OS color-scheme changes.
+- Maintain sufficient contrast for text, icons, controls, focus indicators, selected states, notices, and disabled states.
+- Do not communicate required meaning through color alone.
+- Avoid gradients as a primary motif, glassmorphism, or decorative color effects that compete with icon content.
 
-Microsoft's current Azure Architecture Icons page is the authoritative source for the icon package and its terms:
+## Typography
 
-https://learn.microsoft.com/en-us/azure/architecture/icons/
+- Geist Sans Variable is bundled locally and remains the application font baseline; do not add a runtime font-CDN dependency.
+- Keep a small hierarchy for headings, body text, labels, control text, and metadata.
+- Preserve readability under browser zoom and text scaling.
+- Use truncation only where the full value remains discoverable; avoid fixed control geometry that cuts user-visible icon/service names unnecessarily.
 
-### Non-goals
+## Layout
 
-The following require an explicit design decision before implementation:
+### Package picker
 
-- a supported hosted service, backend, database, account system, cloud sync, or telemetry,
-- automatic package download or runtime package/version checking,
-- persistence of the selected ZIP bytes, SVG bodies, generated image data, or package session outside the explicitly approved file-handle metadata boundary,
-- SVG editing or diagram-canvas/project management; Office multi-object copy is limited to the explicitly approved Experimental Windows localhost bridge contract below,
-- raster file export beyond the transient clipboard PNG workflow,
-- PWA/service-worker behavior or a multi-page/router architecture,
-- additional distribution channels such as native apps, Homebrew, Chocolatey, winget, or Docker,
-- generic multi-cloud abstraction.
+Before a package is loaded, present a focused package picker/dropzone rather than the full browser shell.
 
-## 2. Identity, distribution, and runtime
+When a remembered local file reference exists, expose explicit `Open previous ZIP` and `Forget previous ZIP reference` actions. Browser permission prompts must remain user-gesture driven. Loading may show meaningful phases such as Reading, Validating, and Indexing, but must not invent fake percentage progress.
 
-- Repository: `cloud-arch-icon-browser`
-- npm package: `@shimabell06/cloud-arch-icon-browser`
-- CLI binary: `cloud-arch-icon-browser`
-- Supported distribution: npm/npx
+### Loaded desktop layout
 
-```bash
-npx @shimabell06/cloud-arch-icon-browser
-```
+The desktop layout contains:
 
-The package contains the CLI and prebuilt Web UI. App/package branding must not use `Azure` or `Microsoft` as the product name or app logo.
-
-Runtime policy:
-
-- Node.js support is defined by `package.json`; development and CI use the version pinned in `.node-version`.
-- Package manager: npm.
-- ESM-only package; `package-lock.json` is committed and CI/release use `npm ci`.
-- Supported operating systems: Windows, macOS, and Linux.
-
-The packaged CLI serves the app from the canonical origin `http://127.0.0.1:41731/`. It never falls back to a random port. If that origin already serves a matching Cloud Arch Icon Browser instance, a second invocation reuses/opens it; if another process owns the port, startup fails with an actionable error. The server remains bound only to `127.0.0.1`, serves static content with `GET`/`HEAD`, rejects unsafe paths and unexpected Host headers, attempts to open the default browser, and stops on `Ctrl+C` when this invocation owns the server. Mutating methods remain rejected except for the explicitly approved Experimental PowerPoint bridge endpoint described below.
-
-Public CLI options are limited to no arguments, `-h`/`--help`, and `-v`/`--version`. Additional host/port/ZIP-path options are not part of the current contract.
-
-GitHub Pages may publish repository-owned static builds for maintainer review. Same-repository PRs may use stable `/pr-N/` previews; fork PRs remain build-only. Pages must preserve the same local ZIP-processing and no-persistence boundaries. See `docs/UI_REVIEW.md`.
-
-### Experimental Windows PowerPoint bridge
-
-The packaged Windows `npx` runtime may expose an Experimental, default-enabled Tray `Copy all` workflow before formal real-machine validation is complete. It is not a general backend/API and must remain unavailable outside the canonical local runtime.
-
-Approved bridge contract:
-
-- bind only to the existing `127.0.0.1:41731` server; do not add another listener or cloud service,
-- expose only `GET /__bridge/powerpoint/capability` and `POST /__bridge/powerpoint/copy-all`,
-- validate the normal Host allowlist before bridge routing,
-- require the exact canonical Origin plus a per-process unguessable capability token for the mutating operation,
-- accept only application-owned JSON containing base64 PNG representations and integer quantities; never accept arbitrary local paths, commands, scripts, PowerShell arguments, shell input, COM method names, or generic automation requests,
-- limit a request to 36 output objects, bounded per-image/body sizes, one active operation, and a deterministic timeout,
-- create all temporary image/manifest paths on the server under an unpredictable app-owned OS temp directory and delete them deterministically on success/failure where possible,
-- invoke only the fixed embedded PowerShell/PowerPoint automation sequence required to build a temporary hidden presentation, add one independent picture shape per expanded Tray quantity, copy a deterministic grid `ShapeRange`, close the temporary presentation, and release COM resources,
-- attach to an already-running PowerPoint instance without quitting it; if automation creates its own PowerPoint application, it owns and closes that application,
-- never persist generated PNGs, manifests, Office documents, source SVG bodies, or automation payloads,
-- never fall back to a flattened combined bitmap.
-
-The feature flag key is `cloud-arch-icon-browser:feature:powerpoint-copy-all`; its built-in v0.3 default is enabled, while a local `off` override disables the UI. The first use must show an explicit Experimental warning. Real Windows 11 + current Chromium + desktop Microsoft 365 PowerPoint validation remains tracked separately in Issue #57. Until that validation succeeds, `Copy all` is Experimental rather than formally supported. If validation fails, disable/remove the capability instead of weakening the contract or introducing a flattened fallback.
-
-True vector-image clipboard copy and direct browser-to-PowerPoint drag remain deferred until separately validated; the current SVG clipboard action is source-text copy only.
-
-## 3. Technology and architecture
-
-Foundation:
-
-- Vite, React, TypeScript, Tailwind CSS v4,
-- shadcn/ui with Base UI-backed primitives,
-- Fuse.js for search,
-- `@zip.js/zip.js` for ZIP processing,
-- Node built-in `node:http` plus `open` for the CLI,
-- Biome, Vitest, React Testing Library, Playwright, and `@axe-core/playwright` for quality/testing.
-
-Prefer existing primitives and the simplest implementation consistent with this contract. Do not introduce a foundational dependency or architectural layer without a concrete need and explicit approval.
-
-### Core/domain boundary
-
-Core package parsing, validation, path handling, display-name parsing, category construction, search ranking, persistence parsing/migration, durable icon matching, Tray operations, Saved Set validation/reconciliation, and usage aggregation remain React-independent.
-
-A runtime `IconPackageSession`-style object owns package-scoped resources such as the ZIP reader, entry metadata, search index, lazy extracted SVG Blobs, preview URLs, caches, and disposal. This object must not be stored in local persistence or a serializable shared store.
-
-Derived search results should be computed from state/session inputs rather than duplicated into persistent/shared state.
-
-### Package lifecycle
-
-- Reload returns to the package picker unless a previously remembered local file reference is available; package bytes are never restored from application storage.
-- Initial selection supports the normal file input/drag-and-drop path. A File System Access picker may be preferred where supported. Its `FileSystemFileHandle` may be persisted in IndexedDB only after the candidate package has passed normal validation.
-- A remembered handle with `prompt` permission is reopened only from an explicit `Open previous ZIP` user gesture; the app must not trigger a permission prompt during passive startup. Granted handles may be read only under normal browser permission rules.
-- Denied, stale, moved/deleted, malformed, or inaccessible remembered handles fall back safely to normal package selection. Users can explicitly forget the remembered reference without affecting Favorites or other UI metadata.
-- Package replacement occurs only through the explicit `Change package` flow.
-- Validate a replacement candidate before swapping it into the active session.
-- Invalid replacement preserves the current session.
-- Successful replacement re-matches session Tray entries conservatively against the new package while preserving matched quantity/order and dropping unmatched active items with a notice; it then deterministically disposes the previous session and revokes its object URLs.
-
-## 4. Persistence and durable icon identity
-
-The persistence root key is:
-
-```text
-cloud-arch-icon-browser:state
-```
-
-`localStorage` is untrusted input. The persisted root is schema-versioned; malformed data, unsupported future versions, and read/write failures must fall back safely without blocking package loading.
-
-Approved persisted UI metadata:
-
-- theme preference: `system | light | dark`,
-- view preference: `grid | compact`,
-- sidebar collapsed state,
-- Favorite icon references,
-- recently used icon references,
-- recent search strings,
-- user-defined Saved Sets containing durable icon references, quantity, order, name/id, and timestamps,
-- bounded local icon-usage counters/recency metadata used only for shortcuts.
-
-Never persist ZIP bytes, SVG/generated image bytes, Blob/Object URLs, readers, or package-session resources. `localStorage` never contains file handles.
-
-A separate IndexedDB boundary may store one structured-cloneable `FileSystemFileHandle` for the previously validated package. The handle is a local permission-bearing reference, not a copy of the ZIP. Remembering it is best-effort and must never make package loading depend on IndexedDB availability. A replacement handle is committed only after the replacement package validates successfully.
-
-Favorite/Recent matching is conservative:
-
-1. exact match on canonical visible path (`categoryPath + originalFilename`, excluding a hidden packaging root),
-2. if exact matching fails, a fallback may ignore only the known numeric `NNNNN-icon-service-` filename prefix and is accepted only when exactly one current icon matches.
-
-Fuzzy similarity must never migrate persisted icon identity. Ambiguous/missing records stay persisted but hidden for the active package; a unique fallback match may self-heal the stored reference.
-
-History limits:
-
-- Recent icons: 50, newest first, de-duplicated by durable identity. Recent means meaningful use such as successful Copy or Tray add; merely opening details is not usage.
-- Recent searches: 10, trimmed and case-insensitively de-duplicated.
-- Usage-stat records: 200 maximum, locally derived and never used to change search ranking.
-- Saved Set names: 80 characters maximum; Saved Set icon members preserve durable identity, quantity, and order.
-- Favorites: no automatic count limit.
-
-Persistence schema v2 changes Recent from details-open history to recently-used history. Migration from v1 intentionally does not relabel old details-open records as usage; v1 Recent starts clean under v2 while Favorites/preferences/recent searches are preserved.
-
-## 5. ZIP compatibility and icon model
-
-Compatibility is structural; the runtime does not hard-code a Microsoft package version. Only the latest package explicitly recorded as successfully verified in `COMPATIBILITY.md` is formally supported.
-
-Package handling must:
-
-- enumerate metadata before extracting every SVG body,
-- reject unsafe/ambiguous paths, duplicate normalized paths, encrypted entries, symbolic links, invalid metadata, and structurally implausible archives,
-- ignore non-SVG files for browsing/search,
-- use the ZIP folder hierarchy as the category hierarchy without inventing Microsoft categories,
-- support recursive folders and parent-category subtree selection,
-- hide exactly one common packaging-root folder when every browsable icon shares it,
-- preserve original paths, case, filenames, and SVG bytes for download,
-- lazily extract icons and keep session-owned preview URLs/caches disposable.
-
-Preview validation is defense in depth, not a general-purpose hostile-archive or SVG-sanitization product.
-
-### Display names
-
-For filenames matching the current convention, derive the display name conceptually from:
-
-```text
-^\d+-icon-service-(.+)\.svg$
-```
-
-Strip the convention prefix/suffix, replace hyphens with spaces, and preserve original casing so acronyms such as SQL, AI, and IoT remain intact. Nonmatching SVG filenames use the same extension/hyphen fallback. Original filenames never change.
-
-## 6. Search contract
-
-Search covers display name, original filename, and visible category path. Category selection scopes search to that category subtree while preserving the query.
-
-Ranking priority is deterministic:
-
-1. normalized exact match,
-2. prefix match,
-3. substring match,
-4. Fuse fuzzy fallback.
-
-Normalization should make forms such as `app service`, `app-service`, and `appservice` behave similarly. Strong deterministic matches always outrank fuzzy matches. Search is real-time with a short debounce, weak fuzzy matches are omitted, and results are not arbitrarily capped.
-
-Current Fuse weighting target is display name `0.7`, filename `0.2`, category path `0.1`; tuning may change when justified by measured package behavior without changing the ranking tiers above.
-
-## 7. UX contract
-
-### Visual direction
-
-The UI is calm, dense, modern, and product-focused: neutral surfaces, restrained chrome, and a blue accent. Avoid gradients as a primary motif, glassmorphism, heavy shadows, generic AI-SaaS styling, and Microsoft/Azure brand imitation.
-
-Use semantic design tokens. Geist Sans Variable is bundled locally; do not add runtime font-CDN dependencies.
-
-### Package picker and loaded layout
-
-Before loading, show a focused package picker/dropzone. When a remembered File System Access handle exists, also expose explicit `Open previous ZIP` and `Forget previous ZIP reference` actions. Browser permission prompts must remain user-gesture driven. Loading may report phases such as Reading, Validating, and Indexing without fake percentage progress.
-
-Desktop loaded layout:
-
-- collapsible left sidebar with `All icons`, `Favorites`, `Recent`, `Tray`, and `Categories`,
-- search-first sticky toolbar,
+- a collapsible left sidebar with `All icons`, `Favorites`, `Recent`, `Tray`, and `Categories`,
+- a search-first sticky toolbar,
 - Grid/Compact result presentation,
-- package metadata and `Change package` kept visually secondary.
+- package metadata and `Change package` as visually secondary controls.
 
-Narrow/mobile layouts replace the desktop sidebar with a Drawer/Sheet and must avoid horizontal overflow. Dialogs must remain within the viewport.
+`All icons` is the default workspace after load. Main results remain flat rather than grouped by category.
 
-### Category and search interaction
+### Narrow/mobile layout
 
-- Single category selection; `All icons` is the default workspace after load.
-- Category selection is always visible near search as a removable `Category: …` filter chip.
-- Removing the category chip restores global scope without clearing the query.
-- Main results remain flat rather than grouped by category.
-- Search autocomplete uses the same ranking as results, shows icon/context information, supports Arrow keys/Enter/Escape, and opens the centered details dialog on selection.
+- Replace the persistent desktop sidebar with a Drawer/Sheet.
+- Avoid horizontal overflow.
+- Keep primary search, current scope, Tray access, and result actions reachable.
+- Dialogs and overlays must remain within the viewport.
+- Responsive behavior is based on available layout space, not device-name detection.
+
+## Elevation & Depth
+
+- Prefer surface hierarchy, borders, spacing, and contrast before strong shadows.
+- Use elevation only to communicate layering such as sticky toolbars, drawers, quick panels, popovers, and dialogs.
+- Keep overlays visually distinct from underlying content without glass-heavy or floating-card visual noise.
+
+## Shapes
+
+- Use a small consistent radius vocabulary across cards, inputs, chips, buttons, panels, and dialogs.
+- Shape changes should communicate component role, not arbitrary decoration.
+- Equivalent controls should not use inconsistent corner radii.
+
+## Components
+
+### Search and category scope
+
+- Search is the primary navigation/action surface after package load.
+- A single selected category is always visible near search as a removable `Category: …` filter chip.
+- Removing the category chip restores global scope without clearing the current query.
+- Search autocomplete uses the same product ranking contract as the result list, shows useful icon/context information, supports Arrow keys/Enter/Escape, and opens the centered details dialog on selection.
 - Focused empty search may surface recent searches and matched Favorite shortcuts.
-- `/` focuses search when doing so does not interfere with an editable field or modal context.
+- `/` focuses search only when it does not interfere with an editable field or modal context.
 
-### Favorites, Recent, Tray, Saved Sets, and views
+### Sidebar and navigation
 
-- Favorites are explicit user-curated single-icon shortcuts and use only durable identity metadata.
-- Recent means recently used icons, not details-open history or recent search strings. Successful Copy and Tray add record usage; opening details alone does not.
-- Frequently used shortcuts are computed from bounded local usage statistics and may appear on the empty/global All-icons surface. They never alter exact/prefix/substring/fuzzy search ranking.
-- There is exactly one active Tray. It is React session state, not persisted state: reload/restart clears it. Duplicate durable icons merge into one ordered row with quantity `×N`.
-- The sidebar opens the full Tray workspace. A continuously reachable `Tray N` affordance opens a lightweight quick panel so users can inspect/change quantity/remove items without leaving search results; dragging a card onto that affordance is an optional desktop convenience, never the only Add path.
-- Temporary Select mode collects multiple currently displayed icons into Tray and resets when the material result scope changes.
-- Saved Sets are user-defined reusable Tray combinations persisted as lightweight metadata only. They support create, rename, update, delete, inspect, `Add to Tray`, and `Replace Tray`; unresolved members stay stored and are reported rather than silently deleted.
-- Saved Set sharing uses an explicit versioned Clipboard text payload (`cloud-arch-icon-browser/saved-set`, schema version 1). Clipboard input is untrusted and must validate before import/application; no ZIP/SVG/generated bytes are included.
-- Grid is the default; Grid/Compact is persisted.
-- Card body opens details; Favorite and Add-to-Tray are separate accessible controls. `Copy` remains the primary single-icon quick action.
-- On the canonical Windows `npx` runtime, the Tray may expose Experimental `Copy all` when the local feature flag is enabled. It expands quantities into up to 36 independent PowerPoint picture-shape candidates in Tray order, uses a deterministic left-to-right/top-to-bottom grid, and requires a one-time Experimental acknowledgement before the first operation. Unsupported runtimes show a clean unavailable state rather than attempting automation.
-- Experimental `Copy all` success means the local bridge prepared PowerPoint's clipboard operation; until Issue #57 validates real-machine paste behavior, the UI and documentation must not claim formal independent-shape compatibility. There is no flattened-image fallback.
+- Desktop navigation exposes All icons, Favorites, Recent, Tray, and Categories directly.
+- Sidebar collapse is explicit and must not make core workspaces undiscoverable.
+- Category hierarchy reflects the loaded package hierarchy; parent-category navigation remains understandable for recursive folders.
 
-### Details dialog and copy/download actions
+### Results and icon cards
 
-The centered details dialog shows only real package/application data: preview, display name, category path, original filename, Favorite control, and copy/download actions.
+- Grid is the default view; Grid/Compact is user-selectable.
+- The icon itself and primary identifying text receive visual priority over secondary metadata.
+- Card body opens details.
+- Favorite and Add-to-Tray are separate accessible controls.
+- `Copy` remains the primary single-icon quick action.
+- Selected/Favorite/Tray-related state must remain understandable without hover-only affordances or color-only state.
+
+### Favorites, Recent, Tray, and Saved Sets
+
+- Favorites present user-curated single-icon shortcuts.
+- Recent presents recently used icons, not merely opened details.
+- Frequently used shortcuts may appear on the empty/global All-icons surface without becoming a competing primary navigation concept.
+- The sidebar opens the full Tray workspace.
+- A continuously reachable `Tray N` affordance opens a lightweight quick panel so quantity/removal can be managed without leaving search results.
+- Dragging a card to Tray may exist as a desktop convenience but is never the only Add path.
+- Temporary Select mode supports adding multiple currently displayed icons and visibly resets when the material result scope changes.
+- Saved Set UI supports create, rename, update, delete, inspect, `Add to Tray`, and `Replace Tray`, including clear reporting of unresolved members rather than silently hiding the condition.
+
+### Experimental PowerPoint Copy all
+
+- On the canonical Windows npx runtime, Tray may expose the approved Experimental `Copy all` action when the feature flag is enabled.
+- The first use shows an explicit Experimental warning before initiating the operation.
+- Unsupported runtimes show a clean unavailable state rather than attempting automation.
+- Success copy must not claim formally supported independent-shape PowerPoint compatibility until the product acceptance boundary in `PRODUCT.md` is satisfied.
+- There is no UI path offering a flattened combined-image fallback.
+
+### Details dialog
+
+The centered details dialog shows only real package/application data:
+
+- icon preview,
+- display name,
+- category path,
+- original filename,
+- Favorite control,
+- copy/download actions.
 
 Action hierarchy:
 
-- primary: `Copy image`, producing a transient transparent 512×512 PNG with preserved aspect ratio and centered content,
-- secondary: `Copy SVG source` where supported; this copies original SVG markup text and is not vector-image clipboard copy,
-- secondary: `Download SVG`, preserving the exact original bytes and filename.
+1. primary: `Copy image`,
+2. secondary: `Copy SVG source` where supported,
+3. secondary: `Download SVG`.
 
-Clipboard failures must produce actionable feedback and must not affect the original SVG download path. Do not invent Azure resource descriptions or Microsoft Learn mappings.
+Do not invent Azure resource descriptions or Microsoft Learn mappings. Clipboard failure feedback must be actionable without blocking the original download path.
 
-Dialog focus containment, Escape close, and focus restoration are required.
+Dialog behavior requires focus containment, Escape close, and focus restoration to the invoking context.
 
-### Theme and accessibility
+### Loading, empty, error, and unavailable states
 
-Theme choices are `System`, `Light`, and `Dark`; the preference persists, while `System` follows live OS color-scheme changes.
+- Model loading, validation, empty search, no-match, clipboard failure, package error, missing remembered file, and unsupported Experimental capability deliberately.
+- Preserve the current valid session when a replacement package fails validation.
+- Keep failure copy concise and actionable; do not expose raw implementation errors as the primary user message.
 
-Primary flows must support keyboard operation, visible focus, correct button/dialog semantics, useful image alternative text, and non-color-only state communication. Automated axe checks supplement but do not replace accessibility review.
+### Accessibility
 
-## 8. SVG and browser security
+- Prefer semantic HTML and accessible platform/component primitives.
+- Primary flows support keyboard navigation, visible focus, correct button/dialog semantics, useful image alternative text, and non-color-only state communication.
+- Controls require meaningful accessible names and appropriate target sizes.
+- Automated axe checks supplement rather than replace manual/rendered accessibility review.
 
-- Preview SVGs only in an image context such as `<img>` backed by a session-owned Blob URL. Never inject untrusted SVG markup into the application DOM with `innerHTML` or equivalent APIs.
-- Perform a conservative detached preview check for malformed/active/external content. Unsafe previews may be refused while original bytes remain available for explicit download.
-- Clipboard PNG creation is transient; generated Canvas/PNG/Blob data is not persisted.
-- Experimental multi-object representations must pass the same preview-safety gate before source SVG extraction. For perceived-size normalization, render to an offscreen canvas, detect non-transparent alpha bounds, and refit the visible artwork into a transparent 512×512 square with consistent padding without mutating the source SVG.
-- The Experimental PowerPoint bridge must preserve the strict Host/Origin/capability/payload/temp-file boundaries defined in section 2 and must never expose a generic localhost execution surface.
-- The local server must send a restrictive CSP and appropriate browser security headers. Do not enable `unsafe-eval`.
-- Runtime dependencies must not require a CDN or external API after static assets are loaded.
-- A fatal React error path must dispose the active package session and return to a safe initial state without sending crash data.
+## Do's and Don'ts
 
-`SECURITY.md` contains vulnerability-reporting and security-support policy.
+### Do
 
-## 9. Testing, dependencies, and package safety
+- Make search and the current category scope obvious.
+- Keep `Copy`/`Copy image` visually dominant for the common single-icon workflow.
+- Preserve keyboard operation, focus behavior, and responsive reachability when adding interactions.
+- Use actual rendered screenshots/Pages preview for meaningful UI changes as defined in `docs/UI_REVIEW.md`.
+- Keep icon/package metadata legible at both Grid and Compact densities.
+- Use semantic tokens and existing shadcn/Base UI primitives when they improve consistency and accessibility.
+- Keep application composition outside `src/components/ui`; use that area for reusable UI primitives.
 
-Core/domain logic has the deepest unit coverage. Minimum core coverage gates are:
+### Don't
 
-- Lines: 90%
-- Functions: 90%
-- Statements: 90%
-- Branches: 85%
+- Do not put product requirements, runtime policy, persistence contracts, release policy, or detailed architecture into `DESIGN.md`.
+- Do not imitate Microsoft/Azure branding or generic AI-SaaS visual language.
+- Do not use gradients, glassmorphism, heavy shadows, excessive motion, or decorative density merely because the component stack allows it.
+- Do not hide essential actions behind hover-only behavior.
+- Do not treat a single desktop screenshot as responsive validation.
+- Do not introduce a bespoke component/design abstraction before a real repeated pattern requires it.
+- Do not change approved product behavior just to simplify UI implementation; surface the conflict against `PRODUCT.md` instead.
 
-Playwright covers the representative end-to-end flow, accessibility checks, and a deliberately small stable visual-regression baseline. Tests and review artifacts use only project-owned synthetic ZIP/SVG fixtures; Microsoft icon assets must never become test fixtures or committed visual baselines.
-
-CI includes Linux foundation/browser checks plus packaged CLI smoke validation on Windows and macOS; CodeQL is enabled. Windows-specific bridge tests may inject platform/automation runners and must never require Microsoft Office or Microsoft icon assets on hosted CI. See `CONTRIBUTING.md` and `docs/UI_REVIEW.md` for commands and review procedures.
-
-Dependency/package policy:
-
-- direct dependencies and devDependencies are exact-pinned,
-- foundational/major dependency changes require explicit review,
-- Dependabot monitors npm and GitHub Actions,
-- release validation blocks High/Critical `npm audit` findings,
-- the npm package uses an explicit `files` allowlist and release validation must prevent Microsoft assets, test fixtures, or unrelated development content from being published.
-
-## 10. Release and compatibility contract
-
-Changesets records release intent and updates versions/CHANGELOG. Publication uses GitHub Actions npm Trusted Publishing/OIDC; do not introduce a long-lived npm publish token.
-
-Version identity must match across `package.json`, npm, immutable `vX.Y.Z` Git tag, and GitHub Release. Before `1.0.0`, compatible fixes are patch releases while features or breaking changes are minor releases; breaking `0.x` changes must be called out clearly.
-
-An explicitly labeled Experimental Office capability may be released before real-machine validation only when the design decision, feature flag, user-facing warning, security boundary, failure policy, and follow-up validation Issue are all documented. Such a capability is not formally supported until the required real-machine validation succeeds. If validation fails, disable/remove it; never substitute a behavior that violates the product contract such as flattened multi-object Copy.
-
-Official-package verification is maintainer-only:
-
-```bash
-npm run verify:official -- /path/to/latest-official.zip
-```
-
-Update `COMPATIBILITY.md` only after a successful check against a separately downloaded official ZIP. A scheduled watcher may detect Microsoft package/terms changes and open a maintenance Issue, but it must never download/commit icon assets, make legal decisions, or change compatibility/runtime behavior automatically.
-
-Operational release details belong in `docs/RELEASE.md`.
-
-## 11. Repository governance
-
-Canonical documents:
-
-- `README.md` — public introduction and usage,
-- `DESIGN.md` — current product/engineering contract,
-- `CONTRIBUTING.md` — human contribution workflow,
-- `AGENTS.md` — coding-agent instructions,
-- `COMPATIBILITY.md` — last verified official package metadata,
-- `SECURITY.md` — vulnerability reporting/support policy,
-- `docs/UI_REVIEW.md` — browser visual/Pages review operations,
-- `docs/RELEASE.md` — release operations,
-- `THIRD_PARTY_NOTICES.md` and `LICENSE` — notices/licensing.
-
-Decision history lives in Issues, PRs, CHANGELOG, releases, and Git history rather than a separate ADR set or historical implementation sections in this file.
-
-Use GitHub Flow: `main` is the only long-lived development branch, changes enter through short-lived PRs, CI must pass, PRs use Conventional Commit titles, and merges are squash-only.
-
-### Design-change rule
-
-Explicit approval and a `DESIGN.md` update are required when changing:
-
-- product purpose/non-goals,
-- Microsoft asset handling,
-- runtime network or security boundary,
-- primary architecture/layering,
-- core dependency foundation,
-- supported distribution model,
-- compatibility/support or release/publication model,
-- major UX/navigation behavior.
-
-Implementation details that preserve these contracts may be decided pragmatically by maintainers or coding agents.
+Google's DESIGN.md format is currently alpha. Preserve valid machine-readable front matter and the canonical section order when editing this file. Unsupported but important design rationale stays in Markdown prose rather than invented front-matter fields.
