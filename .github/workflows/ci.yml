@@ -15,7 +15,7 @@ concurrency:
 jobs:
   web-verify:
     name: Shared Web verification
-    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-ci.yml@83c06f73aa21bdd9f1d4fac2fdb2b25d69e5c365
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-ci.yml@7b2ac5cb75b0055489a0f9e2c8864672145bb30e
     with:
       node_version_file: .node-version
       cache_dependency_path: package-lock.json
@@ -23,6 +23,23 @@ jobs:
       run_typecheck: true
       run_test: true
       run_e2e: false
+    permissions:
+      contents: read
+
+  pages-candidate:
+    name: Build Pages candidate
+    needs: web-verify
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-candidate.yml@7b2ac5cb75b0055489a0f9e2c8864672145bb30e
+    with:
+      node_version_file: .node-version
+      cache_dependency_path: package-lock.json
+      build_command: 'npm run build -- --base="$PAGES_BASE_PATH"'
+      output_directory: dist
+      enable_review_images: true
     permissions:
       contents: read
 

@@ -29,20 +29,21 @@ GitHub Pages is an optional interactive review surface for phones, tablets, and 
 
 ### Automatic main and PR previews
 
-`.github/workflows/pages.yml` maintains the normal preview site:
+Pages publication follows the Web App Foundation v0.4.0 candidate/publisher trust split:
 
+- `.github/workflows/ci.yml` runs the reusable `pages-candidate` job only after shared Web verification succeeds.
+- The candidate job builds application code with read-only repository permissions and uploads the static site plus review metadata/images as an Actions artifact.
+- `.github/workflows/pages-publish.yml` is the trusted default-branch caller. It consumes only a validated candidate artifact and never checks out, installs, builds, or executes pull-request source.
 - `main` publishes to `https://shimabell0619.github.io/cloud-arch-icon-browser/`.
 - Same-repository PR `#N` publishes to `https://shimabell0619.github.io/cloud-arch-icon-browser/pr-N/`.
-- Fork PRs are build-validated but are not published because untrusted fork code must not receive write-capable repository or Pages credentials.
+- Fork PRs remain limited to unprivileged validation and are not published.
 - Closing or merging a same-repository PR removes its `pr-N` preview.
 
-The workflow stores generated site content on the automation-owned `pages-content` branch so `main` and active PR previews can coexist. Do not edit that branch manually. Main publication uses the `github-pages` environment; same-repository PR publish/cleanup uses `github-pages-preview`.
+The publisher stores generated site content on the automation-owned `pages-content` branch so `main` and active PR previews can coexist. Do not edit that branch manually. Main publication uses the `github-pages` environment; same-repository PR publish/cleanup uses `github-pages-preview`.
 
 Pages builds use target-specific Vite bases: `/cloud-arch-icon-browser/` for `main` and `/cloud-arch-icon-browser/pr-N/` for PR previews. The normal npm/npx build continues to use `/`.
 
-### Manual selected-ref preview
-
-`.github/workflows/pages-preview.yml` (`Publish Pages Preview`) can publish an explicitly selected branch, tag, or commit SHA for ad-hoc interactive review. This deploys the selected ref as the main Pages site, so use it only when intentionally replacing the current root preview.
+The previous direct write-enabled `.github/workflows/pages.yml` publisher and `.github/workflows/pages-preview.yml` selected-ref publisher were retired when the Foundation Pages profile was adopted. For ad-hoc visual inspection of an arbitrary ref, use the existing `ui-review.yml` workflow rather than replacing the Pages production root.
 
 ### One-time repository setup
 
