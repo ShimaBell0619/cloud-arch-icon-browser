@@ -1,0 +1,84 @@
+# Bootstrap requirement:
+# This caller MUST already exist on the consumer repository's default branch
+# before a PR expects workflow_run-driven Pages publication.
+name: Pages publish
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  publish-production:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    permissions:
+      actions: read
+      contents: write
+      issues: write
+      pull-requests: write
+      pages: write
+      id-token: write
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-publish.yml@7b2ac5cb75b0055489a0f9e2c8864672145bb30e
+    with:
+      operation: publish
+      publish_target: production
+      source_run_id: ${{ github.event.workflow_run.id }}
+      source_sha: ${{ github.event.workflow_run.head_sha }}
+      pr_number: 0
+      production_branch: main
+      validated_workflow_name: CI
+      expect_review_images: true
+
+  publish-preview:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.pull_requests[0].number > 0
+    permissions:
+      actions: read
+      contents: write
+      issues: write
+      pull-requests: write
+      pages: write
+      id-token: write
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-publish.yml@7b2ac5cb75b0055489a0f9e2c8864672145bb30e
+    with:
+      operation: publish
+      publish_target: preview
+      source_run_id: ${{ github.event.workflow_run.id }}
+      source_sha: ${{ github.event.workflow_run.head_sha }}
+      pr_number: ${{ github.event.workflow_run.pull_requests[0].number }}
+      production_branch: main
+      validated_workflow_name: CI
+      expect_review_images: true
+
+  cleanup-preview:
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      actions: read
+      contents: write
+      issues: write
+      pull-requests: write
+      pages: write
+      id-token: write
+    uses: ShimaBell0619/web-app-foundation/.github/workflows/web-pages-publish.yml@7b2ac5cb75b0055489a0f9e2c8864672145bb30e
+    with:
+      operation: cleanup
+      publish_target: preview
+      pr_number: ${{ github.event.pull_request.number }}
+      expect_review_images: true
