@@ -64,7 +64,7 @@
     "@axe-core/playwright": "4.13.0",
     "@biomejs/biome": "2.5.12",
     "@changesets/cli": "2.29.7",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
